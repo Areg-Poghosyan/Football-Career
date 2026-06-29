@@ -6,7 +6,7 @@
   <title>Kick3D</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Playfair+Display:wght@400;700;900&display=swap" rel="stylesheet" />
 
   <style>
     /* ── Reset ──────────────────────────────────────────────── */
@@ -403,13 +403,271 @@
     #newspaper-screen {
       position: fixed;
       inset: 0;
+      background: #0a0a0a;  /* outer surround stays dark */
+      z-index: 2;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      overflow-y: auto;
+    }
+    #newspaper-screen.active { display: flex; }
+
+    /* The newspaper page itself — cream card with thick border */
+    .newspaper-page {
+      background: #f5e6c8;
+      border: 6px solid #111;
+      width: min(780px, 92vw);
+      min-height: calc(100vh - 4rem);
+      margin: 2rem 0;
+      display: flex;
+      flex-direction: column;
+      color: #111;
+      font-family: 'Playfair Display', Georgia, serif;
+    }
+
+    /* Inner padding wrapper so content sits away from the border */
+    .newspaper-inner {
+      padding: 2rem 2.5rem 3rem;
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+    }
+
+    /* Masthead — publication title */
+    .newspaper-title {
+      font-size: clamp(2.2rem, 7vw, 4rem);
+      font-weight: 900;
+      letter-spacing: 0.02em;
+      text-align: center;
+      line-height: 1;
+      text-transform: uppercase;
+      margin-bottom: 0.6rem;
+    }
+
+    /* Thick rule below the masthead */
+    .newspaper-rule {
+      border: none;
+      border-top: 4px solid #111;
+      margin: 0 0 0.5rem;
+    }
+    /* Thin rule below the meta row */
+    .newspaper-rule-thin {
+      border: none;
+      border-top: 1px solid #111;
+      margin: 0.5rem 0 0;
+    }
+
+    /* Meta row: date left */
+    .newspaper-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      font-size: 0.78rem;
+      font-weight: 400;
+      letter-spacing: 0.04em;
+    }
+
+    /* Main article headline */
+    .newspaper-headline {
+      font-size: clamp(1.6rem, 4.5vw, 2.6rem);
+      font-weight: 900;
+      line-height: 1.1;
+      text-align: center;
+      margin: 1.4rem 0 0.6rem;
+      text-wrap: balance;
+    }
+
+    /* Subheadline / deck */
+    .newspaper-deck {
+      font-size: 0.95rem;
+      font-weight: 400;
+      font-style: italic;
+      text-align: center;
+      line-height: 1.5;
+      margin-bottom: 1.2rem;
+      color: #333;
+    }
+
+    /* Rule between deck and body */
+    .newspaper-rule-article {
+      border: none;
+      border-top: 2px solid #111;
+      margin: 0 0 1.2rem;
+    }
+
+    /* Two-column body text */
+    .newspaper-body {
+      column-count: 2;
+      column-gap: 2rem;
+      column-rule: 1px solid #999;
+      font-size: 0.88rem;
+      line-height: 1.75;
+      text-align: justify;
+      hyphens: auto;
+    }
+    .newspaper-body p + p {
+      text-indent: 1.2em;
+    }
+
+    /* "Continue Reading..." — old-press button style */
+    .newspaper-continue-wrap {
+      margin-top: 1.8rem;
+      display: flex;
+      justify-content: center;
+    }
+    .newspaper-continue-btn {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-size: 0.8rem;
+      font-style: italic;
+      letter-spacing: 0.08em;
+      color: #111;
+      background: transparent;
+      border: 2px solid #111;
+      padding: 0.6em 1.6em;
+      cursor: pointer;
+      transition: background 0.2s ease, color 0.2s ease;
+    }
+    .newspaper-continue-btn:hover {
+      background: #111;
+      color: #f5e6c8;
+    }
+
+    /* ── Manager screen (blank for now) ────────────────────── */
+    #manager-screen {
+      position: fixed;
+      inset: 0;
+      background: #0a0a0a;
+      z-index: 2;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+    #manager-screen.active { display: flex; }
+
+    /* ── Training screen (blank for now) ───────────────────── */
+    #training-screen {
+      position: fixed;
+      inset: 0;
       background: #0a0a0a;
       z-index: 2;
       display: none;
       align-items: center;
       justify-content: center;
     }
-    #newspaper-screen.active { display: flex; }
+    #training-screen.active { display: flex; }
+
+    /* Content row: silhouette left, dialogue right */
+    .manager-content {
+      display: flex;
+      align-items: center;
+      gap: 3rem;
+      width: min(820px, 90vw);
+      /* Sits between the two 80px bars */
+      height: calc(100vh - 160px);
+    }
+
+    /* ── Manager silhouette (pure CSS shapes) ────────────────── */
+    .manager-silhouette {
+      position: relative;
+      flex-shrink: 0;
+      width: 120px;
+      height: 220px;
+    }
+
+    .silhouette-head {
+      position: absolute;
+      width: 52px;
+      height: 52px;
+      background: #222;
+      border-radius: 50%;
+      left: 50%;
+      transform: translateX(-50%);
+      top: 0;
+    }
+
+    .silhouette-body {
+      position: absolute;
+      width: 64px;
+      height: 90px;
+      background: #222;
+      left: 50%;
+      transform: translateX(-50%);
+      top: 60px;
+      border-radius: 4px 4px 0 0;
+    }
+
+    /* Arms: rotated rectangles anchored at the shoulder */
+    .silhouette-arm {
+      position: absolute;
+      width: 22px;
+      height: 75px;
+      background: #222;
+      border-radius: 4px;
+      top: 66px;
+    }
+    .silhouette-arm.left {
+      left: 10px;
+      transform-origin: top center;
+      transform: rotate(-18deg);
+    }
+    .silhouette-arm.right {
+      right: 10px;
+      transform-origin: top center;
+      transform: rotate(18deg);
+    }
+
+    /* ── Manager dialogue box ────────────────────────────────── */
+    .manager-dialogue {
+      flex: 1;
+      min-height: 140px;
+      border: 1px solid #fff;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Dialogue text area */
+    .manager-dialogue-text {
+      flex: 1;
+      padding: 1.4rem 1.6rem;
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.8rem;
+      font-weight: 400;
+      letter-spacing: 0.08em;
+      line-height: 1.8;
+      color: #fff;
+    }
+
+    /* Button strip pinned to the bottom-right of the dialogue box */
+    .manager-dialogue-actions {
+      display: flex;
+      justify-content: flex-end;
+      padding: 0.75rem 1rem;
+      border-top: 1px solid #222;
+    }
+
+    .manager-dialogue-btn {
+      background: transparent;
+      border: 1px solid #444;
+      color: #fff;
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      padding: 8px 18px;
+      cursor: pointer;
+      transition: color 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+    }
+    .manager-dialogue-btn:hover {
+      color: #00ff88;
+      border-color: #00ff88;
+      background: rgba(0, 255, 136, 0.05);
+    }
+    .manager-dialogue-btn:active {
+      background: rgba(0, 255, 136, 0.12);
+    }
 
     /* ── Coming-soon popup ──────────────────────────────────── */
     #popup-overlay {
@@ -556,9 +814,76 @@
   <!-- Fade-to-black overlay — sits above everything during transitions -->
   <div id="fade-overlay"></div>
 
-  <!-- Newspaper screen: blank placeholder -->
+  <!-- Newspaper screen -->
   <div id="newspaper-screen">
-    <button class="btn back-btn" onclick="showScreen('origin')">← Back</button>
+    <div class="newspaper-page">
+      <div class="newspaper-inner">
+
+        <!-- Masthead -->
+        <h1 class="newspaper-title">The Football Chronicle</h1>
+        <hr class="newspaper-rule" />
+
+        <!-- Date row -->
+        <div class="newspaper-meta">
+          <span id="newspaper-date"></span>
+        </div>
+        <hr class="newspaper-rule-thin" />
+
+        <!-- Main headline — text set by JS from playerData -->
+        <h2 class="newspaper-headline" id="newspaper-headline"></h2>
+
+        <!-- Subheadline / deck — text set by JS -->
+        <p class="newspaper-deck" id="newspaper-deck"></p>
+
+        <hr class="newspaper-rule-article" />
+
+        <!-- Two-column body copy -->
+        <div class="newspaper-body">
+          <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.</p>
+          <p>Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum. Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam eaque ipsa quae ab illo inventore veritatis et quasi architecto beatae vitae dicta sunt explicabo.</p>
+          <p>Nemo enim ipsam voluptatem quia voluptas sit aspernatur aut odit aut fugit, sed quia consequuntur magni dolores eos qui ratione voluptatem sequi nesciunt. Neque porro quisquam est, qui dolorem ipsum quia dolor sit amet, consectetur, adipisci velit, sed quia non numquam eius modi tempora incidunt.</p>
+          <p>Ut labore et dolore magnam aliquam quaerat voluptatem. Ut enim ad minima veniam, quis nostrum exercitationem ullam corporis suscipit laboriosam, nisi ut aliquid ex ea commodi consequatur? Quis autem vel eum iure reprehenderit qui in ea voluptate velit esse quam nihil molestiae consequatur.</p>
+        </div>
+
+        <div class="newspaper-continue-wrap">
+          <button class="newspaper-continue-btn" id="btn-newspaper-continue">Continue Reading...</button>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Manager screen: blank placeholder -->
+  <div id="manager-screen">
+    <div class="cinematic-bar top"></div>
+
+    <div class="manager-content">
+
+      <!-- Manager silhouette: head + body + two arms, all CSS -->
+      <div class="manager-silhouette">
+        <div class="silhouette-head"></div>
+        <div class="silhouette-arm left"></div>
+        <div class="silhouette-arm right"></div>
+        <div class="silhouette-body"></div>
+      </div>
+
+      <!-- Manager dialogue box -->
+      <div class="manager-dialogue">
+        <div class="manager-dialogue-text" id="manager-dialogue-text"></div>
+        <div class="manager-dialogue-actions">
+          <button class="manager-dialogue-btn" id="btn-manager-continue">Continue ›</button>
+          <button class="manager-dialogue-btn hidden" id="btn-manager-training">Head to Training</button>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="cinematic-bar bottom"></div>
+  </div>
+
+  <!-- Training screen: blank placeholder -->
+  <div id="training-screen">
+    <button class="btn back-btn" onclick="showScreen('manager')">← Back</button>
   </div>
 
   <!-- Coming-soon popup overlay -->
@@ -666,14 +991,18 @@
     const careerScreen      = document.getElementById('career-screen');
     const originScreen      = document.getElementById('origin-screen');
     const newspaperScreen   = document.getElementById('newspaper-screen');
+    const managerScreen     = document.getElementById('manager-screen');
+    const trainingScreen    = document.getElementById('training-screen');
 
     function showScreen(name) {
       menuWrapper.style.display = 'none';
-      [careerScreen, originScreen, newspaperScreen].forEach(s => s.classList.remove('active'));
+      [careerScreen, originScreen, newspaperScreen, managerScreen, trainingScreen].forEach(s => s.classList.remove('active'));
 
       if      (name === 'career')    careerScreen.classList.add('active');
       else if (name === 'origin')    originScreen.classList.add('active');
       else if (name === 'newspaper') newspaperScreen.classList.add('active');
+      else if (name === 'manager')   managerScreen.classList.add('active');
+      else if (name === 'training')  trainingScreen.classList.add('active');
       else                           menuWrapper.style.display = 'flex'; // 'menu'
     }
 
@@ -798,6 +1127,19 @@
     const _showScreen = showScreen;
     showScreen = function(name) {
       _showScreen(name);
+      if (name === 'newspaper') {
+        // Date
+        const now = new Date();
+        document.getElementById('newspaper-date').textContent = now.toLocaleDateString('en-GB', {
+          weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
+        });
+        // Dynamic headline and deck from playerData
+        const { name: pName, club, position, nationality } = playerData;
+        document.getElementById('newspaper-headline').textContent =
+          `${pName} Signs for ${club} — A New Era Begins`;
+        document.getElementById('newspaper-deck').textContent =
+          `The ${nationality} ${position} completes a landmark move that promises to reshape the season ahead.`;
+      }
       if (name === 'origin') {
         // Resolve the position code to a readable word before building lines
         playerData.position = POSITION_LABELS[playerData.position] || playerData.position;
@@ -821,14 +1163,69 @@
 
     const fadeOverlay = document.getElementById('fade-overlay');
 
-    document.getElementById('btn-journey').addEventListener('click', () => {
-      // Fade to black, then swap screens once the overlay is fully opaque
+    // Reusable fade-then-navigate helper
+    function fadeToScreen(name) {
       fadeOverlay.classList.add('fading');
       fadeOverlay.addEventListener('transitionend', () => {
-        showScreen('newspaper');
-        // Fade back out on the new screen
+        showScreen(name);
         fadeOverlay.classList.remove('fading');
       }, { once: true });
+    }
+
+    document.getElementById('btn-journey').addEventListener('click', () => {
+      fadeToScreen('newspaper');
+    });
+
+    document.getElementById('btn-newspaper-continue').addEventListener('click', () => {
+      fadeToScreen('manager');
+    });
+
+    /* ── Manager screen dialogue ────────────────────────────── */
+    let MANAGER_DIALOGUE = [];
+
+    function buildManagerDialogue() {
+      const { name, position, club } = playerData;
+      return [
+        `So you're ${name}. I've heard good things.`,
+        `As a ${position}, I expect everything from you at ${club}.`,
+        `Prove yourself in training. Your journey starts now.`,
+      ];
+    }
+
+    let managerLine = 0;
+
+    const managerDialogueText  = document.getElementById('manager-dialogue-text');
+    const btnManagerContinue   = document.getElementById('btn-manager-continue');
+    const btnManagerTraining   = document.getElementById('btn-manager-training');
+
+    function showManagerLine(index) {
+      managerDialogueText.textContent = MANAGER_DIALOGUE[index];
+    }
+
+    // Rebuild from live playerData each time the screen opens
+    const _showScreen2 = showScreen;
+    showScreen = function(name) {
+      _showScreen2(name);
+      if (name === 'manager') {
+        MANAGER_DIALOGUE = buildManagerDialogue();
+        managerLine = 0;
+        showManagerLine(0);
+        btnManagerContinue.classList.remove('hidden');
+        btnManagerTraining.classList.add('hidden');
+      }
+    };
+
+    btnManagerContinue.addEventListener('click', () => {
+      managerLine++;
+      showManagerLine(managerLine);
+      if (managerLine >= MANAGER_DIALOGUE.length - 1) {
+        btnManagerContinue.classList.add('hidden');
+        btnManagerTraining.classList.remove('hidden');
+      }
+    });
+
+    btnManagerTraining.addEventListener('click', () => {
+      fadeToScreen('training');
     });
 
     /* ── Animation loop — slow Y-axis rotation ──────────────── */
