@@ -552,10 +552,43 @@
       background: #0a0a0a;
       z-index: 2;
       display: none;
-      align-items: center;
-      justify-content: center;
+      flex-direction: column;
     }
     #training-screen.active { display: flex; }
+
+    /* Header bar */
+    #training-header {
+      height: 48px;
+      background: #111;
+      border-bottom: 1px solid #222;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 1.25rem;
+      flex-shrink: 0;
+      z-index: 1;
+    }
+    #training-header-title {
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: #00ff88;
+    }
+    #training-header-name {
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: #888;
+    }
+
+    /* Pitch canvas fills all remaining space below the header */
+    #training-canvas {
+      flex: 1;
+      display: block;
+      width: 100%;
+    }
 
     /* Content row: silhouette left, dialogue right */
     .manager-content {
@@ -883,7 +916,16 @@
 
   <!-- Training screen: blank placeholder -->
   <div id="training-screen">
-    <button class="btn back-btn" onclick="showScreen('manager')">← Back</button>
+
+    <!-- Header bar -->
+    <div id="training-header">
+      <span id="training-header-title">Training Ground</span>
+      <span id="training-header-name"></span>
+    </div>
+
+    <!-- 2D pitch canvas -->
+    <canvas id="training-canvas"></canvas>
+
   </div>
 
   <!-- Coming-soon popup overlay -->
@@ -1227,6 +1269,66 @@
     btnManagerTraining.addEventListener('click', () => {
       fadeToScreen('training');
     });
+
+    /* ── Training screen pitch ──────────────────────────────── */
+    const trainingCanvas = document.getElementById('training-canvas');
+    const tCtx           = trainingCanvas.getContext('2d');
+
+    function drawTrainingPitch() {
+      const W = trainingCanvas.width  = trainingCanvas.offsetWidth;
+      const H = trainingCanvas.height = trainingCanvas.offsetHeight;
+
+      const pad = Math.min(W, H) * 0.07; // inset from canvas edge to pitch boundary
+      const lw  = 2;                      // line width in px
+
+      tCtx.clearRect(0, 0, W, H);
+
+      // ── Pitch surface ───────────────────────────────────────
+      tCtx.fillStyle = '#2d5a1b';
+      tCtx.fillRect(0, 0, W, H);
+
+      tCtx.strokeStyle = '#fff';
+      tCtx.lineWidth   = lw;
+
+      // ── Boundary ────────────────────────────────────────────
+      tCtx.strokeRect(pad, pad, W - pad * 2, H - pad * 2);
+
+      // ── Halfway line ─────────────────────────────────────────
+      const midY = H / 2;
+      tCtx.beginPath();
+      tCtx.moveTo(pad, midY);
+      tCtx.lineTo(W - pad, midY);
+      tCtx.stroke();
+
+      // ── Centre circle ────────────────────────────────────────
+      const cx = W / 2;
+      const r  = Math.min(W, H) * 0.1;
+      tCtx.beginPath();
+      tCtx.arc(cx, midY, r, 0, Math.PI * 2);
+      tCtx.stroke();
+
+      // Centre spot
+      tCtx.fillStyle = '#fff';
+      tCtx.beginPath();
+      tCtx.arc(cx, midY, 3, 0, Math.PI * 2);
+      tCtx.fill();
+    }
+
+    // Redraw on resize so the pitch always fills the available space
+    window.addEventListener('resize', () => {
+      if (trainingScreen.classList.contains('active')) drawTrainingPitch();
+    });
+
+    // Hook into showScreen to populate the header and draw the pitch
+    const _showScreenTraining = showScreen;
+    showScreen = function(name) {
+      _showScreenTraining(name);
+      if (name === 'training') {
+        document.getElementById('training-header-name').textContent = playerData.name || '';
+        // Defer one frame so the canvas has its layout dimensions before drawing
+        requestAnimationFrame(drawTrainingPitch);
+      }
+    };
 
     /* ── Animation loop — slow Y-axis rotation ──────────────── */
     function animate() {
