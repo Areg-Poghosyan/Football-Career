@@ -86,6 +86,70 @@
     .btn:active {
       background: rgba(0, 255, 136, 0.12);
     }
+
+    /* ── Career screen ──────────────────────────────────────── */
+    #career-screen {
+      position: fixed;
+      inset: 0;
+      background: #0a0a0a;
+      z-index: 2;
+      display: none;
+      align-items: center;
+      justify-content: center;
+    }
+    #career-screen.active { display: flex; }
+
+    /* Back button sits top-left of the career screen */
+    .back-btn {
+      position: absolute;
+      top: 2rem;
+      left: 2rem;
+      width: auto;
+      padding: 10px 24px;
+    }
+
+    /* ── Coming-soon popup ──────────────────────────────────── */
+    #popup-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.7);
+      z-index: 10;
+      display: none;
+      align-items: center;
+      justify-content: center;
+    }
+    #popup-overlay.active { display: flex; }
+
+    #popup {
+      background: #111;
+      border: 1px solid #00ff88;
+      padding: 40px 48px;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+      min-width: 280px;
+    }
+
+    #popup-title {
+      font-size: 1rem;
+      font-weight: 700;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: #00ff88;
+    }
+
+    #popup-body {
+      font-size: 0.75rem;
+      letter-spacing: 0.12em;
+      color: #888;
+      text-transform: uppercase;
+    }
+
+    #popup-close {
+      margin-top: 8px;
+    }
   </style>
 </head>
 <body>
@@ -98,12 +162,25 @@
     <nav class="menu" aria-label="Main menu">
       <h1 class="title">Kick3D</h1>
 
-      <!-- Each button logs to console for now; replace with real handlers later -->
-      <button class="btn" onclick="console.log('Play')">Play</button>
-      <button class="btn" onclick="console.log('Career Mode')">Career Mode</button>
-      <button class="btn" onclick="console.log('Settings')">Settings</button>
-      <button class="btn" onclick="console.log('Credits')">Credits</button>
+      <button class="btn" onclick="showPopup('Play')">Play</button>
+      <button class="btn" onclick="showScreen('career')">Career Mode</button>
+      <button class="btn" onclick="showPopup('Settings')">Settings</button>
+      <button class="btn" onclick="showPopup('Credits')">Credits</button>
     </nav>
+  </div>
+
+  <!-- Career screen: blank dark screen shown when Career Mode is clicked -->
+  <div id="career-screen">
+    <button class="btn back-btn" onclick="showScreen('menu')">← Back</button>
+  </div>
+
+  <!-- Coming-soon popup overlay -->
+  <div id="popup-overlay" onclick="closePopup()">
+    <div id="popup" onclick="event.stopPropagation()">
+      <div id="popup-title"></div>
+      <div id="popup-body">Coming soon</div>
+      <button class="btn" id="popup-close" onclick="closePopup()">Close</button>
+    </div>
   </div>
 
   <!-- Three.js from CDN -->
@@ -196,6 +273,33 @@
       camera.updateProjectionMatrix();
       renderer.setSize(window.innerWidth, window.innerHeight);
     });
+
+    /* ── Screen navigation ──────────────────────────────────── */
+    const menuWrapper   = document.querySelector('.menu-wrapper');
+    const careerScreen  = document.getElementById('career-screen');
+
+    function showScreen(name) {
+      if (name === 'career') {
+        menuWrapper.style.display = 'none';
+        careerScreen.classList.add('active');
+      } else {
+        careerScreen.classList.remove('active');
+        menuWrapper.style.display = 'flex';
+      }
+    }
+
+    /* ── Coming-soon popup ──────────────────────────────────── */
+    const popupOverlay = document.getElementById('popup-overlay');
+    const popupTitle   = document.getElementById('popup-title');
+
+    function showPopup(label) {
+      popupTitle.textContent = label;
+      popupOverlay.classList.add('active');
+    }
+
+    function closePopup() {
+      popupOverlay.classList.remove('active');
+    }
 
     /* ── Animation loop — slow Y-axis rotation ──────────────── */
     function animate() {
