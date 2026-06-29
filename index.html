@@ -309,8 +309,98 @@
       background: rgba(0, 255, 136, 0.15);
     }
 
-    /* ── Origin screen (blank for now) ─────────────────────── */
+    /* ── Origin screen ──────────────────────────────────────── */
     #origin-screen {
+      position: fixed;
+      inset: 0;
+      background: #0a0a0a;
+      z-index: 2;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+    #origin-screen.active { display: flex; }
+
+    /* Black cinematic bars — fixed to top and bottom edges */
+    .cinematic-bar {
+      position: absolute;
+      left: 0;
+      right: 0;
+      height: 80px;
+      background: #000;
+    }
+    .cinematic-bar.top    { top: 0; }
+    .cinematic-bar.bottom { bottom: 0; }
+
+    /* Central text box — no border, blends into the dark background */
+    .origin-textbox {
+      width: min(640px, 80vw);
+      min-height: 120px;
+      background: transparent;
+      padding: 1.75rem 2rem;
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.85rem;
+      font-weight: 400;
+      letter-spacing: 0.08em;
+      line-height: 1.8;
+      color: #fff;
+      text-align: center;
+    }
+
+    /* Buttons sit inside the bottom cinematic bar, right-aligned */
+    .origin-btn {
+      position: absolute;
+      bottom: 0;
+      right: 2rem;
+      height: 80px;            /* matches bar height */
+      display: flex;
+      align-items: center;
+    }
+
+    /* Shared style for both dialogue buttons */
+    .origin-btn button {
+      background: transparent;
+      border: 1px solid #444;
+      color: #fff;
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      padding: 10px 22px;
+      cursor: pointer;
+      transition: color 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+    }
+    .origin-btn button:hover {
+      color: #00ff88;
+      border-color: #00ff88;
+      background: rgba(0, 255, 136, 0.05);
+    }
+    .origin-btn button:active {
+      background: rgba(0, 255, 136, 0.12);
+    }
+
+    /* Hidden utility */
+    .hidden { display: none !important; }
+
+    /* ── Fade-to-black overlay ──────────────────────────────── */
+    #fade-overlay {
+      position: fixed;
+      inset: 0;
+      background: #000;
+      z-index: 100;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.8s ease;
+    }
+    #fade-overlay.fading {
+      opacity: 1;
+      pointer-events: all;
+    }
+
+    /* ── Newspaper screen (blank for now) ───────────────────── */
+    #newspaper-screen {
       position: fixed;
       inset: 0;
       background: #0a0a0a;
@@ -319,7 +409,7 @@
       align-items: center;
       justify-content: center;
     }
-    #origin-screen.active { display: flex; }
+    #newspaper-screen.active { display: flex; }
 
     /* ── Coming-soon popup ──────────────────────────────────── */
     #popup-overlay {
@@ -445,9 +535,30 @@
     <button id="btn-begin" disabled>Begin My Journey</button>
   </div>
 
-  <!-- Origin screen: blank placeholder, navigated to after player creation -->
+  <!-- Origin screen: cinematic dialogue layout -->
   <div id="origin-screen">
-    <button class="btn back-btn" onclick="showScreen('career')">← Back</button>
+    <div class="cinematic-bar top"></div>
+
+    <div class="origin-textbox" id="origin-text"></div>
+
+    <div class="cinematic-bar bottom">
+      <!-- "Continue" advances through dialogue lines -->
+      <div class="origin-btn" id="btn-continue-wrap">
+        <button id="btn-continue">Continue ›</button>
+      </div>
+      <!-- "My Journey Begins" appears after the last line -->
+      <div class="origin-btn hidden" id="btn-journey-wrap">
+        <button id="btn-journey">My Journey Begins</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Fade-to-black overlay — sits above everything during transitions -->
+  <div id="fade-overlay"></div>
+
+  <!-- Newspaper screen: blank placeholder -->
+  <div id="newspaper-screen">
+    <button class="btn back-btn" onclick="showScreen('origin')">← Back</button>
   </div>
 
   <!-- Coming-soon popup overlay -->
@@ -551,21 +662,19 @@
     });
 
     /* ── Screen navigation ──────────────────────────────────── */
-    const menuWrapper   = document.querySelector('.menu-wrapper');
-    const careerScreen  = document.getElementById('career-screen');
-    const originScreen  = document.getElementById('origin-screen');
-
-    const SCREENS = [menuWrapper, careerScreen, originScreen];
+    const menuWrapper       = document.querySelector('.menu-wrapper');
+    const careerScreen      = document.getElementById('career-screen');
+    const originScreen      = document.getElementById('origin-screen');
+    const newspaperScreen   = document.getElementById('newspaper-screen');
 
     function showScreen(name) {
-      // Hide all screens first
-      menuWrapper.style.display  = 'none';
-      careerScreen.classList.remove('active');
-      originScreen.classList.remove('active');
+      menuWrapper.style.display = 'none';
+      [careerScreen, originScreen, newspaperScreen].forEach(s => s.classList.remove('active'));
 
-      if      (name === 'career') careerScreen.classList.add('active');
-      else if (name === 'origin') originScreen.classList.add('active');
-      else                        menuWrapper.style.display = 'flex'; // 'menu'
+      if      (name === 'career')    careerScreen.classList.add('active');
+      else if (name === 'origin')    originScreen.classList.add('active');
+      else if (name === 'newspaper') newspaperScreen.classList.add('active');
+      else                           menuWrapper.style.display = 'flex'; // 'menu'
     }
 
     /* ── Club grid ──────────────────────────────────────────── */
@@ -628,10 +737,13 @@
     inputPosition.addEventListener('change', checkReady);
     inputNationality.addEventListener('change', checkReady);
 
+    // Declared at outer scope so dialogue system and other screens can read it
+    let playerData = {};
+
     btnBegin.addEventListener('click', () => {
       if (btnBegin.disabled) return;
 
-      const playerData = {
+      playerData = {
         name:        inputName.value.trim(),
         position:    inputPosition.value,
         nationality: inputNationality.value,
@@ -654,6 +766,70 @@
     function closePopup() {
       popupOverlay.classList.remove('active');
     }
+
+    /* ── Origin screen dialogue ─────────────────────────────── */
+    // Built fresh each time the origin screen opens, using live playerData values
+    function buildDialogue() {
+      const { name, position, nationality, club } = playerData;
+      return [
+        `From the streets of ${nationality}, ${name} had always been different.`,
+        `Every ${position} dreams of the big stage. For ${name}, that dream was about to begin.`,
+        `The call from ${club} changed everything.`,
+      ];
+    }
+
+    let DIALOGUE = [];
+
+    let dialogueLine = 0;
+
+    const originText      = document.getElementById('origin-text');
+    const btnContinueWrap = document.getElementById('btn-continue-wrap');
+    const btnJourneyWrap  = document.getElementById('btn-journey-wrap');
+
+    // Renders the current line into the text box
+    function showDialogueLine(index) {
+      originText.textContent = DIALOGUE[index];
+    }
+
+    // Maps position codes to readable labels for the dialogue text
+    const POSITION_LABELS = { GK: 'goalkeeper', DEF: 'defender', MID: 'midfielder', FWD: 'forward' };
+
+    // Called each time the origin screen is shown — rebuild dialogue and reset to line 0
+    const _showScreen = showScreen;
+    showScreen = function(name) {
+      _showScreen(name);
+      if (name === 'origin') {
+        // Resolve the position code to a readable word before building lines
+        playerData.position = POSITION_LABELS[playerData.position] || playerData.position;
+        DIALOGUE = buildDialogue();
+        dialogueLine = 0;
+        showDialogueLine(0);
+        btnContinueWrap.classList.remove('hidden');
+        btnJourneyWrap.classList.add('hidden');
+      }
+    };
+
+    document.getElementById('btn-continue').addEventListener('click', () => {
+      dialogueLine++;
+      showDialogueLine(dialogueLine);
+      // On the last line, swap Continue for My Journey Begins
+      if (dialogueLine >= DIALOGUE.length - 1) {
+        btnContinueWrap.classList.add('hidden');
+        btnJourneyWrap.classList.remove('hidden');
+      }
+    });
+
+    const fadeOverlay = document.getElementById('fade-overlay');
+
+    document.getElementById('btn-journey').addEventListener('click', () => {
+      // Fade to black, then swap screens once the overlay is fully opaque
+      fadeOverlay.classList.add('fading');
+      fadeOverlay.addEventListener('transitionend', () => {
+        showScreen('newspaper');
+        // Fade back out on the new screen
+        fadeOverlay.classList.remove('fading');
+      }, { once: true });
+    });
 
     /* ── Animation loop — slow Y-axis rotation ──────────────── */
     function animate() {
