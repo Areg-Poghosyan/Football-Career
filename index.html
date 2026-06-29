@@ -278,6 +278,49 @@
       color: #00ff88;
     }
 
+    /* ── Begin My Journey button ────────────────────────────── */
+    #btn-begin {
+      width: 100%;
+      max-width: 560px;
+      margin-top: 1.5rem;
+      padding: 16px 0;
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.85rem;
+      font-weight: 700;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      border: 1px solid #222;
+      background: transparent;
+      color: #333;
+      cursor: not-allowed;
+      transition: color 0.25s ease, border-color 0.25s ease,
+                  background 0.25s ease, cursor 0.25s ease;
+    }
+    /* Lit-up state when all fields are complete */
+    #btn-begin.ready {
+      color: #00ff88;
+      border-color: #00ff88;
+      cursor: pointer;
+    }
+    #btn-begin.ready:hover {
+      background: rgba(0, 255, 136, 0.08);
+    }
+    #btn-begin.ready:active {
+      background: rgba(0, 255, 136, 0.15);
+    }
+
+    /* ── Origin screen (blank for now) ─────────────────────── */
+    #origin-screen {
+      position: fixed;
+      inset: 0;
+      background: #0a0a0a;
+      z-index: 2;
+      display: none;
+      align-items: center;
+      justify-content: center;
+    }
+    #origin-screen.active { display: flex; }
+
     /* ── Coming-soon popup ──────────────────────────────────── */
     #popup-overlay {
       position: fixed;
@@ -398,6 +441,13 @@
       </div>
 
     </div>
+
+    <button id="btn-begin" disabled>Begin My Journey</button>
+  </div>
+
+  <!-- Origin screen: blank placeholder, navigated to after player creation -->
+  <div id="origin-screen">
+    <button class="btn back-btn" onclick="showScreen('career')">← Back</button>
   </div>
 
   <!-- Coming-soon popup overlay -->
@@ -503,15 +553,19 @@
     /* ── Screen navigation ──────────────────────────────────── */
     const menuWrapper   = document.querySelector('.menu-wrapper');
     const careerScreen  = document.getElementById('career-screen');
+    const originScreen  = document.getElementById('origin-screen');
+
+    const SCREENS = [menuWrapper, careerScreen, originScreen];
 
     function showScreen(name) {
-      if (name === 'career') {
-        menuWrapper.style.display = 'none';
-        careerScreen.classList.add('active');
-      } else {
-        careerScreen.classList.remove('active');
-        menuWrapper.style.display = 'flex';
-      }
+      // Hide all screens first
+      menuWrapper.style.display  = 'none';
+      careerScreen.classList.remove('active');
+      originScreen.classList.remove('active');
+
+      if      (name === 'career') careerScreen.classList.add('active');
+      else if (name === 'origin') originScreen.classList.add('active');
+      else                        menuWrapper.style.display = 'flex'; // 'menu'
     }
 
     /* ── Club grid ──────────────────────────────────────────── */
@@ -544,13 +598,48 @@
         <div class="club-name">${club.name}</div>
       `;
       card.addEventListener('click', () => {
-        // Deselect previous
         if (selectedClub) selectedClub.classList.remove('selected');
-        // Select this card (clicking the same card again keeps it selected)
         card.classList.add('selected');
         selectedClub = card;
+        checkReady();
       });
       clubGrid.appendChild(card);
+    });
+
+    /* ── Begin My Journey — validation & submit ─────────────── */
+    const inputName        = document.getElementById('input-name');
+    const inputPosition    = document.getElementById('input-position');
+    const inputNationality = document.getElementById('input-nationality');
+    const btnBegin         = document.getElementById('btn-begin');
+
+    // Runs after any field change; enables the button only when all four are set
+    function checkReady() {
+      const ready =
+        inputName.value.trim() !== '' &&
+        inputPosition.value    !== '' &&
+        inputNationality.value !== '' &&
+        selectedClub !== null;
+
+      btnBegin.disabled = !ready;
+      btnBegin.classList.toggle('ready', ready);
+    }
+
+    inputName.addEventListener('input', checkReady);
+    inputPosition.addEventListener('change', checkReady);
+    inputNationality.addEventListener('change', checkReady);
+
+    btnBegin.addEventListener('click', () => {
+      if (btnBegin.disabled) return;
+
+      const playerData = {
+        name:        inputName.value.trim(),
+        position:    inputPosition.value,
+        nationality: inputNationality.value,
+        club:        selectedClub.dataset.club,
+      };
+
+      console.log('playerData:', playerData);
+      showScreen('origin');
     });
 
     /* ── Coming-soon popup ──────────────────────────────────── */
