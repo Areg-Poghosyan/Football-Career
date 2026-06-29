@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Kick3D</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet" />
+
+  <style>
+    /* ── Reset ──────────────────────────────────────────────── */
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    /* ── Base ───────────────────────────────────────────────── */
+    body {
+      background: #0a0a0a;
+      color: #ffffff;
+      font-family: 'Orbitron', sans-serif;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* ── Three.js canvas — fixed full-screen background ─────── */
+    #bg-canvas {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+    }
+
+    /* ── Menu sits above the canvas ─────────────────────────── */
+    .menu-wrapper {
+      position: relative;
+      z-index: 1;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* ── Menu container ─────────────────────────────────────── */
+    .menu {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+    }
+
+    /* ── Game title ─────────────────────────────────────────── */
+    .title {
+      font-size: clamp(3rem, 10vw, 6rem);
+      font-weight: 900;
+      letter-spacing: 0.08em;
+      color: #ffffff;
+      margin-bottom: 48px;
+    }
+
+    /* ── Buttons ────────────────────────────────────────────── */
+    .btn {
+      width: 260px;
+      padding: 14px 0;
+      background: transparent;
+      border: 1px solid #333;
+      color: #ffffff;
+      font-family: 'Orbitron', sans-serif;
+      font-size: 0.85rem;
+      font-weight: 700;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: color 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+    }
+
+    .btn:hover,
+    .btn:focus-visible {
+      color: #00ff88;
+      border-color: #00ff88;
+      background: rgba(0, 255, 136, 0.05);
+      outline: none;
+    }
+
+    .btn:active {
+      background: rgba(0, 255, 136, 0.12);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Three.js renders into this canvas -->
+  <canvas id="bg-canvas"></canvas>
+
+  <!-- Menu overlaid on top of the canvas -->
+  <div class="menu-wrapper">
+    <nav class="menu" aria-label="Main menu">
+      <h1 class="title">Kick3D</h1>
+
+      <!-- Each button logs to console for now; replace with real handlers later -->
+      <button class="btn" onclick="console.log('Play')">Play</button>
+      <button class="btn" onclick="console.log('Career Mode')">Career Mode</button>
+      <button class="btn" onclick="console.log('Settings')">Settings</button>
+      <button class="btn" onclick="console.log('Credits')">Credits</button>
+    </nav>
+  </div>
+
+  <!-- Three.js from CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+  <script>
+    /* ── Scene setup ────────────────────────────────────────── */
+    const renderer = new THREE.WebGLRenderer({
+      canvas: document.getElementById('bg-canvas'),
+      antialias: true
+    });
+    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setClearColor(0x0a0a0a);
+
+    const scene  = new THREE.Scene();
+    // Camera angled down to show the pitch in perspective
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera.position.set(0, 14, 18);
+    camera.lookAt(0, 0, 0);
+
+    /* ── Pitch group — everything rotates together ──────────── */
+    const pitchGroup = new THREE.Group();
+    scene.add(pitchGroup);
+
+    /* ── Pitch surface (green plane) ────────────────────────── */
+    const surfaceGeo = new THREE.PlaneGeometry(20, 30);
+    const surfaceMat = new THREE.MeshBasicMaterial({ color: 0x1a7a3a });
+    const surface    = new THREE.Mesh(surfaceGeo, surfaceMat);
+    surface.rotation.x = -Math.PI / 2; // lay flat
+    pitchGroup.add(surface);
+
+    /* ── White line helper ──────────────────────────────────── */
+    // Draws a thin white rectangle (line) lying flat on the pitch.
+    // x, z = centre position; w = width along X; d = depth along Z
+    function addLine(x, z, w, d) {
+      const geo  = new THREE.PlaneGeometry(w, d);
+      const mat  = new THREE.MeshBasicMaterial({ color: 0xffffff });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.rotation.x = -Math.PI / 2;
+      mesh.position.set(x, 0.01, z); // 0.01 above surface to avoid z-fighting
+      pitchGroup.add(mesh);
+    }
+
+    const lw = 0.12; // line width (metres equivalent)
+
+    // Outer border
+    addLine(0,   0,   20,   lw);   // top edge
+    addLine(0,   0,   20,   lw);   // (reused — overridden below with correct positions)
+
+    // Border: top, bottom, left, right
+    addLine(0,  -15,  20,   lw);   // top touchline
+    addLine(0,   15,  20,   lw);   // bottom touchline
+    addLine(-10,  0,  lw,   30);   // left touchline
+    addLine( 10,  0,  lw,   30);   // right touchline
+
+    // Halfway line
+    addLine(0, 0, 20, lw);
+
+    // Centre circle — approximated with a ring geometry
+    const ringGeo = new THREE.RingGeometry(2.5, 2.5 + lw, 48);
+    const ringMat = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide });
+    const ring    = new THREE.Mesh(ringGeo, ringMat);
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.y = 0.01;
+    pitchGroup.add(ring);
+
+    // Centre spot
+    const spotGeo = new THREE.CircleGeometry(0.18, 16);
+    const spotMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+    const spot    = new THREE.Mesh(spotGeo, spotMat);
+    spot.rotation.x = -Math.PI / 2;
+    spot.position.y = 0.01;
+    pitchGroup.add(spot);
+
+    // Penalty boxes (top and bottom)
+    function addBox(zCenter) {
+      const bw = 10, bd = 5; // box width, depth
+      addLine(0,          zCenter - bd / 2, bw, lw); // far edge
+      addLine(0,          zCenter + bd / 2, bw, lw); // near edge
+      addLine(-bw / 2,    zCenter,          lw, bd); // left edge
+      addLine( bw / 2,    zCenter,          lw, bd); // right edge
+    }
+    addBox(-12.5); // top penalty box
+    addBox( 12.5); // bottom penalty box
+
+    /* ── Resize handler ─────────────────────────────────────── */
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    /* ── Animation loop — slow Y-axis rotation ──────────────── */
+    function animate() {
+      requestAnimationFrame(animate);
+      pitchGroup.rotation.y += 0.003; // slow, steady spin
+      renderer.render(scene, camera);
+    }
+    animate();
+  </script>
+
+</body>
+</html>
