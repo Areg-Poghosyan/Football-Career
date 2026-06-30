@@ -1429,7 +1429,7 @@
       tCtx.fill();
 
       // ── Goal (top end) ────────────────────────────────────────
-      const goalW = (W - pad * 2) * 0.3;
+      const goalW = (W - pad * 2) * 0.15;
       const goalD = pad * 0.6;   // depth extends outside the pitch boundary
       tCtx.strokeStyle = '#fff';
       tCtx.lineWidth   = lw;
@@ -1456,6 +1456,8 @@
     let tDrillDone   = false;
     const CONE_TRIGGER = 28; // px — ball centre must come within this distance
 
+    let tConePassed = [];
+
     const drillInstructionLabel = document.getElementById('training-drill-label');
     const goalFlash = document.getElementById('goal-flash');
     let goalFlashTimer = null;
@@ -1469,38 +1471,105 @@
     function completeDrill(n) {
       document.getElementById('drill-step-' + n).classList.add('done');
       if (n < 3) drillInstructionLabel.textContent = DRILL_INSTRUCTIONS[n];
+      if (n === 2) spawnD3Ball();
     }
 
     function initCones(W, H, pad) {
-      const pitchW = W - pad * 2, pitchH = H - pad * 2;
-      const cx = W / 2;
-      const offset = pitchW * 0.07;
-      tCones = [0.2, 0.35, 0.5, 0.65, 0.8].map((t, i) => ({
-        x: cx + (i % 2 === 0 ? -offset : offset),
-        y: pad + t * pitchH,
+      const cx      = W / 2;
+      const spawnY  = H - pad - T_R - 20;  // just above ball spawn
+      tCones = [0, 1, 2, 3, 4].map(i => ({
+        x: cx,
+        y: spawnY - 40 - i * 160,
       }));
       tNextCone  = 0;
+      tConePassed = tCones.map(() => false);
       tDrillDone = false;
       tDrill2Done = false;
+      tDrill3Done = false;
+      tD3Ball.active = false;
       [1, 2, 3].forEach(n => document.getElementById('drill-step-' + n).classList.remove('done'));
       drillInstructionLabel.textContent = DRILL_INSTRUCTIONS[0];
       goalFlash.classList.remove('visible');
     }
 
     function checkConeProgress() {
-      if (tDrillDone || tNextCone >= tCones.length) return;
-      const c  = tCones[tNextCone];
-      const dx = tBall.x - c.x, dy = tBall.y - c.y;
-      if (Math.sqrt(dx * dx + dy * dy) < CONE_TRIGGER) {
-        tNextCone++;
-        if (tNextCone >= tCones.length) {
-          tDrillDone = true;
-          completeDrill(1);
+      if (tDrillDone) return;
+      const ballSpeed = Math.sqrt(tBall.vx * tBall.vx + tBall.vy * tBall.vy);
+      if (ballSpeed < 0.5) return; // ball must be moving — not just player standing near cone
+      tCones.forEach((c, i) => {
+        if (tConePassed[i]) return;
+        const dx = tBall.x - c.x, dy = tBall.y - c.y;
+        if (Math.sqrt(dx * dx + dy * dy) < 60) {
+          tConePassed[i] = true;
+          console.log(`Cone ${i + 1} passed`);
+          if (tConePassed.every(Boolean)) {
+            tDrillDone = true;
+            completeDrill(1);
+          }
         }
-      }
+      });
     }
 
     let tDrill2Done = false;
+    let tDrill3Done = false;
+    const tD3Ball   = { x: 0, y: 0, vx: 0, vy: 0, active: false };
+    const D3_ROLL   = 0.8; // px per frame — slow incoming roll
+
+    function spawnD3Ball() {
+      const W   = trainingCanvas.width;
+      const H   = trainingCanvas.height;
+      const pad = Math.min(W, H) * 0.07;
+      tD3Ball.x      = W / 2 + (Math.random() - 0.5) * (W - pad * 2) * 0.4;
+      tD3Ball.y      = pad + T_BALL_R + 4;
+      tD3Ball.vx     = 0;
+      tD3Ball.vy     = D3_ROLL;
+      tD3Ball.active = true;
+    }
+
+    function updateD3Ball(W, H, pad) {
+      if (!tD3Ball.active || tDrill3Done) return;
+
+      // Spawn on first frame after drill 2 done
+      if (!tD3Ball.active) return;
+
+      tD3Ball.vx *= T_FRICTION;
+      tD3Ball.vy *= T_FRICTION;
+      // Re-apply roll if nearly stopped (keeps it moving toward player)
+      if (Math.abs(tD3Ball.vy) < D3_ROLL * 0.5) tD3Ball.vy = D3_ROLL;
+
+      tD3Ball.x = Math.max(pad + T_BALL_R, Math.min(W - pad - T_BALL_R, tD3Ball.x + tD3Ball.vx));
+      tD3Ball.y = Math.max(pad + T_BALL_R, Math.min(H - pad - T_BALL_R, tD3Ball.y + tD3Ball.vy));
+
+      // Player collision — kick it
+      const colDist = T_R + T_BALL_R;
+      const dx = tD3Ball.x - tPlayer.x, dy = tD3Ball.y - tPlayer.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < colDist && dist > 0) {
+        const nx = dx / dist, ny = dy / dist;
+        tD3Ball.x  = tPlayer.x + nx * colDist;
+        tD3Ball.y  = tPlayer.y + ny * colDist;
+        tD3Ball.vx = nx * T_SPEED * 2.5;
+        tD3Ball.vy = ny * T_SPEED * 2.5;
+      }
+
+      // Goal check for d3 ball
+      const cx    = W / 2;
+      const goalW = (W - pad * 2) * 0.3;
+      const goalD = pad * 0.6;
+      if (
+        tD3Ball.x - T_BALL_R >= cx - goalW / 2 &&
+        tD3Ball.x + T_BALL_R <= cx + goalW / 2 &&
+        tD3Ball.y - T_BALL_R <= pad &&
+        tD3Ball.y + T_BALL_R >= pad - goalD
+      ) {
+        tD3Ball.active = false;
+        goalFlash.classList.add('visible');
+        clearTimeout(goalFlashTimer);
+        goalFlashTimer = setTimeout(() => goalFlash.classList.remove('visible'), 2000);
+        tDrill3Done = true;
+        completeDrill(3);
+      }
+    }
 
     function checkGoal() {
       if (tDrill2Done) return;
@@ -1529,7 +1598,7 @@
       tCones.forEach((c, i) => {
         tCtx.beginPath();
         tCtx.arc(c.x, c.y, 5, 0, Math.PI * 2);
-        tCtx.fillStyle = i < tNextCone ? '#885500' : '#ff6a00';
+        tCtx.fillStyle = tConePassed[i] ? '#885500' : '#ff6a00';
         tCtx.fill();
       });
     }
@@ -1589,9 +1658,16 @@
 
       checkConeProgress();
       checkGoal();
+      updateD3Ball(W, H, pad);
       drawTrainingPitch();
       drawCones();
       drawBall();
+      if (tD3Ball.active) {
+        tCtx.beginPath();
+        tCtx.arc(tD3Ball.x, tD3Ball.y, T_BALL_R, 0, Math.PI * 2);
+        tCtx.fillStyle = '#ff4444';
+        tCtx.fill();
+      }
       drawPlayer();
 
       tLoopId = requestAnimationFrame(trainingLoop);
@@ -1614,10 +1690,11 @@
         document.getElementById('training-header-name').textContent = playerData.name || '';
         requestAnimationFrame(() => requestAnimationFrame(() => {
           const W = trainingCanvas.offsetWidth, H = trainingCanvas.offsetHeight, pad = Math.min(W, H) * 0.07;
-          tPlayer.x = W / 2;
-          tPlayer.y = H / 2;
-          tBall.x   = W / 2 + 60;
-          tBall.y   = H / 2;
+          const spawnY  = H - pad - T_R - 20;
+          tPlayer.x = W / 2 + T_R * 2 + T_BALL_R + 4;
+          tPlayer.y = spawnY;
+          tBall.x   = W / 2;
+          tBall.y   = spawnY;
           initCones(W, H, pad);
           drawTrainingPitch(); drawCones(); drawBall(); drawPlayer();
           if (!tLoopId) trainingLoop();
