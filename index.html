@@ -2312,6 +2312,41 @@
     let mTmPassTimer = 0;
     mScene.add(mTmGroup);
 
+    // Second teammate — left wing position, same humanoid + kit
+    const mTm2Group = new THREE.Group();
+    const tm2JerseyMat = new THREE.MeshLambertMaterial({ color: mJerseyColor });
+    const tm2ShortsMat = new THREE.MeshLambertMaterial({ color: mShortsColor });
+    const tm2SkinMat   = new THREE.MeshLambertMaterial({ color: 0xd4a57a });
+    const tm2BootMat   = new THREE.MeshLambertMaterial({ color: 0x222222 });
+    [-LEG_SPREAD, LEG_SPREAD].forEach(ox => {
+      const leg = new THREE.Mesh(new THREE.CylinderGeometry(LEG_R, LEG_R * 0.85, LEG_H, SEG), tm2ShortsMat);
+      leg.position.set(ox, LEG_H / 2, 0); mTm2Group.add(leg);
+      const boot = new THREE.Mesh(new THREE.CylinderGeometry(BOOT_R, BOOT_R, BOOT_H, SEG), tm2BootMat);
+      boot.position.set(ox, BOOT_H / 2, 0); mTm2Group.add(boot);
+    });
+    const tm2Shorts = new THREE.Mesh(new THREE.CylinderGeometry(TORSO_R, TORSO_R * 0.9, SHORTS_H, SEG), tm2ShortsMat);
+    tm2Shorts.position.y = LEG_H + SHORTS_H / 2; mTm2Group.add(tm2Shorts);
+    const tm2Jersey = new THREE.Mesh(new THREE.CylinderGeometry(TORSO_R * 0.95, TORSO_R, TORSO_H, SEG), tm2JerseyMat);
+    tm2Jersey.position.y = LEG_H + SHORTS_H + TORSO_H / 2; mTm2Group.add(tm2Jersey);
+    const tm2ShoulderY = LEG_H + SHORTS_H + TORSO_H * 0.75;
+    [-1, 1].forEach(side => {
+      const arm = new THREE.Mesh(new THREE.CylinderGeometry(ARM_R, ARM_R * 0.85, ARM_H, SEG), tm2JerseyMat);
+      arm.position.set(side * (TORSO_R + ARM_R * 0.6), tm2ShoulderY - ARM_H / 2 + 0.045, 0);
+      mTm2Group.add(arm);
+    });
+    const tm2Head = new THREE.Mesh(new THREE.SphereGeometry(HEAD_R, SEG, SEG), tm2SkinMat);
+    tm2Head.position.y = LEG_H + SHORTS_H + TORSO_H + HEAD_R + 0.05; mTm2Group.add(tm2Head);
+    const TM2_HOME = { x: -15, z: -5 };
+    mTm2Group.position.set(TM2_HOME.x, 0, TM2_HOME.z);
+    let mTm2PassTimer = 0;
+    mScene.add(mTm2Group);
+    // Previous positions for velocity estimation (predictive passing)
+    const mPrev = {
+      player: { x: 0, z: 20 },
+      tm:     { x: TM_HOME.x,  z: TM_HOME.z },
+      tm2:    { x: TM2_HOME.x, z: TM2_HOME.z },
+    };
+
     const M_SPEED = 0.12;
     const M_CAM_TARGET = new THREE.Vector3();
     let mCamYaw   = Math.PI; // start facing toward far goal
@@ -2416,7 +2451,7 @@
 
       // AI — chase ball, kick toward player goal when close
       // AI dribble logic — only engage when ball is within home zone
-      const AI_SPEED = 0.055, AI_DRIBBLE_DIST = 1.4, AI_SHOOT_Z = -32, AI_ENGAGE = 22;
+      const AI_SPEED = 0.055, AI_DRIBBLE_DIST = 1.4, AI_SHOOT_Z = -32, AI_ENGAGE = 20;
       const aiBallHomeDx = mBall.position.x - AI_HOME.x;
       const aiBallHomeDz = mBall.position.z - AI_HOME.z;
       const aiBallHomeDist = Math.sqrt(aiBallHomeDx * aiBallHomeDx + aiBallHomeDz * aiBallHomeDz);
@@ -2454,43 +2489,73 @@
         }
       }
 
-      // Teammate — chase ball in home zone, pass to player when close enough
-      const TM_ENGAGE = 18, TM_SPEED = 0.04, TM_PASS_RANGE = 45;
-      mTmPassTimer = Math.max(0, mTmPassTimer - 1);
-      const tmbdx = mBall.position.x - TM_HOME.x;
-      const tmbdz = mBall.position.z - TM_HOME.z;
-      const ballHomeDist = Math.sqrt(tmbdx * tmbdx + tmbdz * tmbdz);
-      if (ballHomeDist < TM_ENGAGE) {
-        const tbdx = mBall.position.x - mTmGroup.position.x;
-        const tbdz = mBall.position.z - mTmGroup.position.z;
-        const tbdist = Math.sqrt(tbdx * tbdx + tbdz * tbdz);
-        if (tbdist <= 1.5 && mTmPassTimer === 0) {
-          // Has the ball — check if player is in passing range
-          const tpdx = mPlayerGroup.position.x - mTmGroup.position.x;
-          const tpdz = mPlayerGroup.position.z - mTmGroup.position.z;
-          const tpdist = Math.sqrt(tpdx * tpdx + tpdz * tpdz);
-          if (tpdist < TM_PASS_RANGE) {
-            // Pass toward player — power scales with distance
-            const spd = Math.min(1.4, tpdist * 0.038);
-            mBallVel.x = (tpdx / tpdist) * spd;
-            mBallVel.z = (tpdz / tpdist) * spd;
-            mBallVel.y = Math.min(0.22, tpdist * 0.006);
-            mTmPassTimer = 90;
+      // Update velocity snapshots
+      const mVel = {
+        player: { x: mPlayerGroup.position.x - mPrev.player.x, z: mPlayerGroup.position.z - mPrev.player.z },
+        tm:     { x: mTmGroup.position.x  - mPrev.tm.x,  z: mTmGroup.position.z  - mPrev.tm.z  },
+        tm2:    { x: mTm2Group.position.x - mPrev.tm2.x, z: mTm2Group.position.z - mPrev.tm2.z },
+      };
+      mPrev.player.x = mPlayerGroup.position.x; mPrev.player.z = mPlayerGroup.position.z;
+      mPrev.tm.x     = mTmGroup.position.x;     mPrev.tm.z     = mTmGroup.position.z;
+      mPrev.tm2.x    = mTm2Group.position.x;    mPrev.tm2.z    = mTm2Group.position.z;
+
+      // Shared teammate helper — pass toward predicted position of closest target
+      function tmPass(fromGroup, passTimer, setTimer) {
+        const candidates = [
+          { group: mPlayerGroup, vel: mVel.player },
+          { group: mTmGroup,     vel: mVel.tm     },
+          { group: mTm2Group,    vel: mVel.tm2    },
+        ].filter(c => c.group !== fromGroup);
+        let best = null, bestDist = Infinity;
+        candidates.forEach(c => {
+          const dx = c.group.position.x - fromGroup.position.x;
+          const dz = c.group.position.z - fromGroup.position.z;
+          const d = Math.sqrt(dx * dx + dz * dz);
+          if (d < 45 && d < bestDist) {
+            // Estimate frames for ball to travel distance d, then predict receiver pos
+            const spd = Math.min(0.8, d * 0.022);
+            const frames = d / spd;
+            const px = c.group.position.x + c.vel.x * frames;
+            const pz = c.group.position.z + c.vel.z * frames;
+            const pdx = px - fromGroup.position.x;
+            const pdz = pz - fromGroup.position.z;
+            bestDist = d;
+            best = { dx: pdx, dz: pdz, d: Math.sqrt(pdx * pdx + pdz * pdz) };
           }
-          // else hold — player out of range, keep ball close
-        } else if (tbdist > 1.5) {
-          mTmGroup.position.x += (tbdx / tbdist) * TM_SPEED;
-          mTmGroup.position.z += (tbdz / tbdist) * TM_SPEED;
-        }
-      } else {
-        const thdx = TM_HOME.x - mTmGroup.position.x;
-        const thdz = TM_HOME.z - mTmGroup.position.z;
-        const thdist = Math.sqrt(thdx * thdx + thdz * thdz);
-        if (thdist > 0.1) {
-          mTmGroup.position.x += (thdx / thdist) * TM_SPEED;
-          mTmGroup.position.z += (thdz / thdist) * TM_SPEED;
+        });
+        if (best) {
+          const spd = Math.min(0.8, best.d * 0.022);
+          mBallVel.x = (best.dx / best.d) * spd;
+          mBallVel.z = (best.dz / best.d) * spd;
+          mBallVel.y = Math.min(0.22, best.d * 0.006);
+          setTimer(90);
         }
       }
+      function tmMove(group, home, engage, speed) {
+        const tbdx = mBall.position.x - group.position.x;
+        const tbdz = mBall.position.z - group.position.z;
+        const tbdist = Math.sqrt(tbdx * tbdx + tbdz * tbdz);
+        const bhdx = mBall.position.x - home.x, bhdz = mBall.position.z - home.z;
+        const ballHomeDist = Math.sqrt(bhdx * bhdx + bhdz * bhdz);
+        if (ballHomeDist < engage && tbdist > 1.5) {
+          group.position.x += (tbdx / tbdist) * speed;
+          group.position.z += (tbdz / tbdist) * speed;
+        } else if (ballHomeDist >= engage) {
+          const hx = home.x - group.position.x, hz = home.z - group.position.z;
+          const hd = Math.sqrt(hx * hx + hz * hz);
+          if (hd > 0.1) { group.position.x += (hx / hd) * speed; group.position.z += (hz / hd) * speed; }
+        }
+        return tbdist;
+      }
+      const TM_ENGAGE = 18, TM_SPEED = 0.04;
+      // Teammate 1
+      mTmPassTimer = Math.max(0, mTmPassTimer - 1);
+      const tm1BallDist = tmMove(mTmGroup, TM_HOME, TM_ENGAGE, TM_SPEED);
+      if (tm1BallDist <= 1.5 && mTmPassTimer === 0) tmPass(mTmGroup, mTmPassTimer, v => mTmPassTimer = v);
+      // Teammate 2
+      mTm2PassTimer = Math.max(0, mTm2PassTimer - 1);
+      const tm2BallDist = tmMove(mTm2Group, TM2_HOME, TM_ENGAGE, TM_SPEED);
+      if (tm2BallDist <= 1.5 && mTm2PassTimer === 0) tmPass(mTm2Group, mTm2PassTimer, v => mTm2PassTimer = v);
 
       updateMatchCamera();
       mRenderer.render(mScene, mCamera);
