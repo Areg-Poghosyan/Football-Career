@@ -588,6 +588,7 @@
       flex: 1;
       display: block;
       width: 100%;
+      min-height: 0;
     }
 
     /* Content row: silhouette left, dialogue right */
@@ -1325,8 +1326,8 @@
       _showScreenTraining(name);
       if (name === 'training') {
         document.getElementById('training-header-name').textContent = playerData.name || '';
-        // Defer one frame so the canvas has its layout dimensions before drawing
-        requestAnimationFrame(drawTrainingPitch);
+        // Two-frame defer: first frame commits the flex layout, second reads correct offsetHeight
+        requestAnimationFrame(() => requestAnimationFrame(drawTrainingPitch));
       }
     };
 
