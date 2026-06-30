@@ -506,6 +506,36 @@
       border-radius: 5px;
       transition: background 0.1s;
     }
+    #match-score {
+      position: absolute;
+      top: 1rem;
+      left: 50%;
+      transform: translateX(-50%);
+      color: #fff;
+      font-size: 1.4rem;
+      font-weight: 700;
+      text-shadow: 0 1px 4px rgba(0,0,0,0.8);
+      pointer-events: none;
+      z-index: 5;
+      letter-spacing: 0.1em;
+    }
+    #match-goal-flash {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 6rem;
+      font-weight: 900;
+      color: #fff;
+      text-shadow: 0 0 40px #ffe600, 0 4px 16px rgba(0,0,0,0.7);
+      letter-spacing: 0.08em;
+      pointer-events: none;
+      z-index: 10;
+      opacity: 0;
+      transition: opacity 0.15s;
+    }
+    #match-goal-flash.visible { opacity: 1; }
 
     /* Back button stays top-left */
 
@@ -1255,6 +1285,8 @@
   <div id="match-screen">
     <button class="btn back-btn" onclick="showScreen('prematch')" style="position:relative;z-index:1;">← Back</button>
     <canvas id="match-canvas" style="position:absolute;inset:0;width:100%;height:100%;display:block;"></canvas>
+    <div id="match-score">0 – 0</div>
+    <div id="match-goal-flash">GOAL!</div>
     <div id="power-bar-wrap"><div id="power-bar-fill"></div></div>
   </div>
 
@@ -1984,7 +2016,7 @@
 
     // Flat green pitch plane
     const mPitch = new THREE.Mesh(
-      new THREE.PlaneGeometry(68, 105),
+      new THREE.PlaneGeometry(120, 160),
       new THREE.MeshLambertMaterial({ color: 0x2e7d32 })
     );
     mPitch.rotation.x = -Math.PI / 2;
@@ -2086,6 +2118,47 @@
     addNet( 52.5);
 
     // Ball — white sphere at pitch centre
+    let mScoreHome = 0, mScoreAway = 0;
+    let mGoalPending = false;
+    const mScoreEl     = document.getElementById('match-score');
+    const mGoalFlashEl = document.getElementById('match-goal-flash');
+
+    function mResetKickoff() {
+      mBall.position.set(0, M_BALL_R, 0);
+      mBallVel.x = 0; mBallVel.y = 0; mBallVel.z = 0;
+      mPlayerGroup.position.set(0, 0, 20);
+      mCamYaw = Math.PI;
+    }
+
+    function mCheckGoal() {
+      if (mGoalPending) return;
+      const bx = mBall.position.x, by = mBall.position.y, bz = mBall.position.z;
+      const inX = Math.abs(bx) < GW / 2;
+      const inY = by < GH && by > 0;
+      // Far goal (z > 52.5) — player's scoring end
+      if (inX && inY && bz - M_BALL_R > 52.5) {
+        mScoreHome++;
+        mTriggerGoal();
+      }
+      // Near goal (z < -52.5) — own goal end
+      if (inX && inY && bz + M_BALL_R < -52.5) {
+        mScoreAway++;
+        mTriggerGoal();
+      }
+    }
+
+    function mTriggerGoal() {
+      mGoalPending = true;
+      mBallVel.x = 0; mBallVel.y = 0; mBallVel.z = 0;
+      mScoreEl.textContent = mScoreHome + ' – ' + mScoreAway;
+      mGoalFlashEl.classList.add('visible');
+      setTimeout(() => {
+        mGoalFlashEl.classList.remove('visible');
+        mResetKickoff();
+        mGoalPending = false;
+      }, 2000);
+    }
+
     const mBall = new THREE.Mesh(
       new THREE.SphereGeometry(0.22, 16, 16),
       new THREE.MeshLambertMaterial({ color: 0xffffff })
@@ -2167,6 +2240,9 @@
       // Power bar — fill while M1 held
       if (mMouseDown || mMouseDown2) mPower = Math.min(100, mPower + 1.8);
       mPowerFill.style.width = mPower + '%';
+
+      mCheckGoal();
+      if (mGoalPending) { updateMatchCamera(); mRenderer.render(mScene, mCamera); mLoopId = requestAnimationFrame(matchLoop); return; }
 
       // Ball physics — gravity + air drag (always) + ground friction
       mBallVel.y -= M_GRAVITY;
