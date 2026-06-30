@@ -2239,20 +2239,42 @@
     mPlayerGroup.position.set(0, 0, 20); // start near near-end, facing far goal
     mScene.add(mPlayerGroup);
 
-    // AI opponent — static red capsule
+    // AI opponent — humanoid in opponent red kit
     const mAiGroup = new THREE.Group();
-    const aiMat = new THREE.MeshLambertMaterial({ color: 0xcc1111 });
-    const AI_R = 0.35, AI_H = 1.1, AI_SEG = 8;
-    const aiBody = new THREE.Mesh(new THREE.CylinderGeometry(AI_R, AI_R, AI_H, AI_SEG), aiMat);
-    aiBody.position.y = AI_R + AI_H / 2;
-    mAiGroup.add(aiBody);
-    const aiCapTop = new THREE.Mesh(new THREE.SphereGeometry(AI_R, AI_SEG, AI_SEG, 0, Math.PI * 2, 0, Math.PI / 2), aiMat);
-    aiCapTop.position.y = AI_R + AI_H;
-    mAiGroup.add(aiCapTop);
-    const aiCapBot = new THREE.Mesh(new THREE.SphereGeometry(AI_R, AI_SEG, AI_SEG, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), aiMat);
-    aiCapBot.position.y = AI_R;
-    mAiGroup.add(aiCapBot);
+    const aiJerseyMat = new THREE.MeshLambertMaterial({ color: 0xcc1111 });
+    const aiShortsMat = new THREE.MeshLambertMaterial({ color: 0xffffff });
+    const aiBootMat  = new THREE.MeshLambertMaterial({ color: 0x222222 });
+    const aiSkinMat  = new THREE.MeshLambertMaterial({ color: 0xd4a57a });
+    // reuse player proportions
+    const ai_LEG_R = LEG_R, ai_LEG_H = LEG_H, ai_LEG_SPREAD = LEG_SPREAD;
+    const ai_BOOT_H = BOOT_H, ai_BOOT_R = BOOT_R;
+    const ai_TORSO_R = TORSO_R, ai_TORSO_H = TORSO_H, ai_SHORTS_H = SHORTS_H;
+    const ai_ARM_R = ARM_R, ai_ARM_H = ARM_H, ai_HEAD_R = HEAD_R;
+    [-ai_LEG_SPREAD, ai_LEG_SPREAD].forEach(ox => {
+      const leg = new THREE.Mesh(new THREE.CylinderGeometry(ai_LEG_R, ai_LEG_R * 0.85, ai_LEG_H, SEG), aiShortsMat);
+      leg.position.set(ox, ai_LEG_H / 2, 0);
+      mAiGroup.add(leg);
+      const boot = new THREE.Mesh(new THREE.CylinderGeometry(ai_BOOT_R, ai_BOOT_R, ai_BOOT_H, SEG), aiBootMat);
+      boot.position.set(ox, ai_BOOT_H / 2, 0);
+      mAiGroup.add(boot);
+    });
+    const aiShorts = new THREE.Mesh(new THREE.CylinderGeometry(ai_TORSO_R, ai_TORSO_R * 0.9, ai_SHORTS_H, SEG), aiShortsMat);
+    aiShorts.position.y = ai_LEG_H + ai_SHORTS_H / 2;
+    mAiGroup.add(aiShorts);
+    const aiJersey = new THREE.Mesh(new THREE.CylinderGeometry(ai_TORSO_R * 0.95, ai_TORSO_R, ai_TORSO_H, SEG), aiJerseyMat);
+    aiJersey.position.y = ai_LEG_H + ai_SHORTS_H + ai_TORSO_H / 2;
+    mAiGroup.add(aiJersey);
+    const aiShoulderY = ai_LEG_H + ai_SHORTS_H + ai_TORSO_H * 0.75;
+    [-1, 1].forEach(side => {
+      const arm = new THREE.Mesh(new THREE.CylinderGeometry(ai_ARM_R, ai_ARM_R * 0.85, ai_ARM_H, SEG), aiJerseyMat);
+      arm.position.set(side * (ai_TORSO_R + ai_ARM_R * 0.6), aiShoulderY - ai_ARM_H / 2 + 0.045, 0);
+      mAiGroup.add(arm);
+    });
+    const aiHead = new THREE.Mesh(new THREE.SphereGeometry(ai_HEAD_R, SEG, SEG), aiSkinMat);
+    aiHead.position.y = ai_LEG_H + ai_SHORTS_H + ai_TORSO_H + ai_HEAD_R + 0.05;
+    mAiGroup.add(aiHead);
     mAiGroup.position.set(0, 0, -20); // opposite end of pitch from player
+    let mAiTouchTimer = 0;
     mScene.add(mAiGroup);
 
     const M_SPEED = 0.12;
@@ -2355,6 +2377,37 @@
         const mTouchMult = (mdx !== 0 || mdz !== 0) ? 0.46 : 0.4;
         mBallVel.x = nx * M_SPEED * mTouchMult;
         mBallVel.z = nz * M_SPEED * mTouchMult;
+      }
+
+      // AI — chase ball, kick toward player goal when close
+      // AI dribble logic
+      const AI_SPEED = 0.055, AI_DRIBBLE_DIST = 1.4, AI_SHOOT_Z = -32;
+      const aidx = mBall.position.x - mAiGroup.position.x;
+      const aidz = mBall.position.z - mAiGroup.position.z;
+      const aidist = Math.sqrt(aidx * aidx + aidz * aidz);
+      mAiTouchTimer = Math.max(0, mAiTouchTimer - 1);
+      if (aidist <= AI_DRIBBLE_DIST) {
+        // Close to ball — dribble toward goal or shoot
+        if (mAiGroup.position.z < AI_SHOOT_Z) {
+          // In shooting range — strike toward goal
+          mBallVel.x = (Math.random() - 0.5) * 0.25;
+          mBallVel.z = -1.1;
+          mBallVel.y = 0.12;
+          mAiTouchTimer = 90; // back off after shot
+        } else if (mAiTouchTimer === 0) {
+          // Gentle touch — nudge ball toward goal, AI advances
+          mBallVel.x += (-mBall.position.x * 0.03);  // nudge toward centre
+          mBallVel.z = -0.22;
+          mBallVel.y = 0.03;
+          mAiTouchTimer = 22;
+        }
+        // AI body follows ball toward goal
+        mAiGroup.position.z -= AI_SPEED * 0.9;
+        mAiGroup.position.x += (mBall.position.x - mAiGroup.position.x) * 0.05;
+      } else {
+        // Chase ball
+        mAiGroup.position.x += (aidx / aidist) * AI_SPEED;
+        mAiGroup.position.z += (aidz / aidist) * AI_SPEED;
       }
 
       updateMatchCamera();
