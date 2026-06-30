@@ -1315,9 +1315,82 @@
       tCtx.fill();
     }
 
+    // ── Player state ─────────────────────────────────────────────
+    const tPlayer = { x: 0, y: 0 };
+    const tKeys   = {};
+    const T_R     = 10;   // player radius px
+    const T_SPEED = 2.5;  // px per frame
+
+    window.addEventListener('keydown', e => { tKeys[e.key] = true;  });
+    window.addEventListener('keyup',   e => { tKeys[e.key] = false; });
+
+    const tBall = { x: 0, y: 0, vx: 0, vy: 0 };
+    const T_BALL_R  = 7;
+    const T_FRICTION = 0.97;
+
+    function drawBall() {
+      tCtx.beginPath();
+      tCtx.arc(tBall.x, tBall.y, T_BALL_R, 0, Math.PI * 2);
+      tCtx.fillStyle = '#ffe600';
+      tCtx.fill();
+    }
+
+    function drawPlayer() {
+      tCtx.beginPath();
+      tCtx.arc(tPlayer.x, tPlayer.y, T_R, 0, Math.PI * 2);
+      tCtx.fillStyle = '#ffffff';
+      tCtx.fill();
+    }
+
+    let tLoopId = null;
+    function trainingLoop() {
+      if (!trainingScreen.classList.contains('active')) { tLoopId = null; return; }
+
+      const W   = trainingCanvas.width;
+      const H   = trainingCanvas.height;
+      const pad = Math.min(W, H) * 0.07;
+
+      let dx = 0, dy = 0;
+      if (tKeys['ArrowLeft']  || tKeys['a']) dx -= 1;
+      if (tKeys['ArrowRight'] || tKeys['d']) dx += 1;
+      if (tKeys['ArrowUp']    || tKeys['w']) dy -= 1;
+      if (tKeys['ArrowDown']  || tKeys['s']) dy += 1;
+
+      // Move player
+      if (dx !== 0 || dy !== 0) {
+        const len = Math.sqrt(dx * dx + dy * dy);
+        tPlayer.x = Math.max(pad + T_R, Math.min(W - pad - T_R, tPlayer.x + dx / len * T_SPEED));
+        tPlayer.y = Math.max(pad + T_R, Math.min(H - pad - T_R, tPlayer.y + dy / len * T_SPEED));
+      }
+
+      // Ball physics
+      tBall.vx *= T_FRICTION;
+      tBall.vy *= T_FRICTION;
+      tBall.x = Math.max(pad + T_BALL_R, Math.min(W - pad - T_BALL_R, tBall.x + tBall.vx));
+      tBall.y = Math.max(pad + T_BALL_R, Math.min(H - pad - T_BALL_R, tBall.y + tBall.vy));
+
+      // Player–ball collision
+      const colDist = T_R + T_BALL_R;
+      const bDx = tBall.x - tPlayer.x, bDy = tBall.y - tPlayer.y;
+      const dist = Math.sqrt(bDx * bDx + bDy * bDy);
+      if (dist < colDist && dist > 0) {
+        const nx = bDx / dist, ny = bDy / dist;
+        tBall.x = tPlayer.x + nx * colDist;
+        tBall.y = tPlayer.y + ny * colDist;
+        tBall.vx = nx * T_SPEED * 2.5;
+        tBall.vy = ny * T_SPEED * 2.5;
+      }
+
+      drawTrainingPitch();
+      drawBall();
+      drawPlayer();
+
+      tLoopId = requestAnimationFrame(trainingLoop);
+    }
+
     // Redraw on resize so the pitch always fills the available space
     window.addEventListener('resize', () => {
-      if (trainingScreen.classList.contains('active')) drawTrainingPitch();
+      if (trainingScreen.classList.contains('active')) { drawTrainingPitch(); drawBall(); drawPlayer(); }
     });
 
     // Hook into showScreen to populate the header and draw the pitch
@@ -1326,8 +1399,16 @@
       _showScreenTraining(name);
       if (name === 'training') {
         document.getElementById('training-header-name').textContent = playerData.name || '';
-        // Two-frame defer: first frame commits the flex layout, second reads correct offsetHeight
-        requestAnimationFrame(() => requestAnimationFrame(drawTrainingPitch));
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+          tPlayer.x = trainingCanvas.offsetWidth  / 2;
+          tPlayer.y = trainingCanvas.offsetHeight / 2;
+          tBall.x   = trainingCanvas.offsetWidth  / 2 + 60;
+          tBall.y   = trainingCanvas.offsetHeight / 2;
+          drawTrainingPitch();
+          drawBall();
+          drawPlayer();
+          if (!tLoopId) trainingLoop();
+        }));
       }
     };
 
