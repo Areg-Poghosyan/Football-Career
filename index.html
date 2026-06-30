@@ -2054,6 +2054,37 @@
     addGoal(-52.5); // near end
     addGoal( 52.5); // far end
 
+    // Goal nets — wireframe grid behind each goal
+    const mNetMat = new THREE.MeshBasicMaterial({ color: 0xffffff, wireframe: true, opacity: 0.35, transparent: true });
+    const NET_D = 4.0; // depth of net behind goal line
+
+    function addNet(z) {
+      const dir = z < 0 ? -1 : 1; // net extends away from pitch
+      // Back panel
+      const back = new THREE.Mesh(new THREE.PlaneGeometry(GW, GH, 10, 6), mNetMat);
+      back.position.set(0, GH / 2, z + dir * NET_D);
+      if (dir > 0) back.rotation.y = Math.PI;
+      mScene.add(back);
+      // Top panel
+      const top = new THREE.Mesh(new THREE.PlaneGeometry(GW, NET_D, 10, 3), mNetMat);
+      top.rotation.x = Math.PI / 2;
+      top.position.set(0, GH, z + dir * NET_D / 2);
+      mScene.add(top);
+      // Left side panel
+      const left = new THREE.Mesh(new THREE.PlaneGeometry(NET_D, GH, 3, 6), mNetMat);
+      left.rotation.y = Math.PI / 2;
+      left.position.set(-GW / 2, GH / 2, z + dir * NET_D / 2);
+      mScene.add(left);
+      // Right side panel
+      const right = new THREE.Mesh(new THREE.PlaneGeometry(NET_D, GH, 3, 6), mNetMat);
+      right.rotation.y = -Math.PI / 2;
+      right.position.set( GW / 2, GH / 2, z + dir * NET_D / 2);
+      mScene.add(right);
+    }
+
+    addNet(-52.5);
+    addNet( 52.5);
+
     // Ball — white sphere at pitch centre
     const mBall = new THREE.Mesh(
       new THREE.SphereGeometry(0.22, 16, 16),
@@ -2137,8 +2168,10 @@
       if (mMouseDown || mMouseDown2) mPower = Math.min(100, mPower + 1.8);
       mPowerFill.style.width = mPower + '%';
 
-      // Ball physics — gravity + friction
+      // Ball physics — gravity + air drag (always) + ground friction
       mBallVel.y -= M_GRAVITY;
+      mBallVel.x *= 0.993; // light air drag every frame
+      mBallVel.z *= 0.993;
       mBall.position.x += mBallVel.x;
       mBall.position.y += mBallVel.y;
       mBall.position.z += mBallVel.z;
@@ -2146,19 +2179,20 @@
       // Pitch boundary walls
       if (mBall.position.x < -34 + M_BALL_R)  { mBall.position.x = -34 + M_BALL_R;  mBallVel.x =  Math.abs(mBallVel.x); }
       if (mBall.position.x >  34 - M_BALL_R)  { mBall.position.x =  34 - M_BALL_R;  mBallVel.x = -Math.abs(mBallVel.x); }
-      if (mBall.position.z < -52.5 + M_BALL_R){ mBall.position.z = -52.5 + M_BALL_R; mBallVel.z =  Math.abs(mBallVel.z); }
-      if (mBall.position.z >  52.5 - M_BALL_R){ mBall.position.z =  52.5 - M_BALL_R; mBallVel.z = -Math.abs(mBallVel.z); }
+      const inGoalOpening = Math.abs(mBall.position.x) < GW / 2 && mBall.position.y < GH;
+      if (mBall.position.z < -52.5 + M_BALL_R && !inGoalOpening) { mBall.position.z = -52.5 + M_BALL_R; mBallVel.z =  Math.abs(mBallVel.z); }
+      if (mBall.position.z >  52.5 - M_BALL_R && !inGoalOpening) { mBall.position.z =  52.5 - M_BALL_R; mBallVel.z = -Math.abs(mBallVel.z); }
 
       // Ground bounce / rolling friction
       if (mBall.position.y <= M_BALL_R) {
         mBall.position.y = M_BALL_R;
         if (mBallVel.y < -0.02) {
-          mBallVel.y = -mBallVel.y * 0.55; // bounce
+          mBallVel.y = -mBallVel.y * 0.45; // bounce with more energy loss
         } else {
-          mBallVel.y = 0; // come to rest on ground
+          mBallVel.y = 0;
         }
-        mBallVel.x *= 0.985; // rolling friction only while on ground
-        mBallVel.z *= 0.985;
+        mBallVel.x *= 0.97; // stronger rolling friction on ground
+        mBallVel.z *= 0.97;
       }
 
       // Player–ball collision (XZ only, treat ball as always reachable vertically when on ground)
@@ -2199,7 +2233,7 @@
           const sdz = mBall.position.z - mPlayerGroup.position.z;
           if (Math.sqrt(sdx * sdx + sdz * sdz) < M_SHOOT_RANGE) {
             const t = mPower / 100;
-            const fwd = Math.min(t * 1.4, 0.9);
+            const fwd = Math.min(t * 1.6, 1.1);
             mBallVel.x = -Math.sin(mCamYaw) * fwd;
             mBallVel.z = -Math.cos(mCamYaw) * fwd;
             mBallVel.y =  Math.pow(t, 1.5) * 0.28;
