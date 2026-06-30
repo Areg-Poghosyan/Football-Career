@@ -2117,6 +2117,25 @@
     addNet(-52.5);
     addNet( 52.5);
 
+    // Advertising boards — continuous black barrier surrounding the pitch
+    const AD_H = 1.0, AD_D = 0.15;
+    const AD_OFFSET = 4.5;
+    const adXEdge = 34 + AD_OFFSET;       // 37.6
+    const adZEdge = 52.5 + AD_OFFSET;     // 56.1
+    const adSideLen = adZEdge * 2;        // full length along touchlines
+    const adEndLen  = adXEdge * 2;        // full width along goal lines
+    const adMat = new THREE.MeshLambertMaterial({ color: 0x111111 });
+    [[-adXEdge, adSideLen, true], [adXEdge, adSideLen, true]].forEach(([x, len]) => {
+      const b = new THREE.Mesh(new THREE.BoxGeometry(AD_D, AD_H, len), adMat);
+      b.position.set(x, AD_H / 2, 0);
+      mScene.add(b);
+    });
+    [[-adZEdge, adEndLen], [adZEdge, adEndLen]].forEach(([z, len]) => {
+      const b = new THREE.Mesh(new THREE.BoxGeometry(len, AD_H, AD_D), adMat);
+      b.position.set(0, AD_H / 2, z);
+      mScene.add(b);
+    });
+
     // Ball — white sphere at pitch centre
     let mScoreHome = 0, mScoreAway = 0;
     let mGoalPending = false;
@@ -2169,20 +2188,72 @@
     const M_GRAVITY = 0.012;
     const M_BALL_R  = 0.22;
 
-    // Player capsule — cylinder body + sphere top, blue
-    const mPlayerMat = new THREE.MeshLambertMaterial({ color: 0x1565c0 });
+    // Player humanoid — legs + shorts + jersey + arms + head
+    const CLUB_COLORS = { 'Man City': 0x6CABDD, 'Real Madrid': 0xFEBE10, 'Barcelona': 0xA50044,
+      'Bayern Munich': 0xDC052D, 'PSG': 0x004170, 'Liverpool': 0xC8102E, 'Chelsea': 0x034694,
+      'Juventus': 0x1a1a1a, 'AC Milan': 0xFB090B, 'Ajax': 0xD2122E, 'Dortmund': 0xFDE100, 'Porto': 0x003DA5 };
+    const CLUB_SHORTS = { 'Man City': 0xffffff, 'Real Madrid': 0xffffff, 'Barcelona': 0x004D98,
+      'Bayern Munich': 0xffffff, 'PSG': 0xffffff, 'Liverpool': 0xffffff, 'Chelsea': 0xffffff,
+      'Juventus': 0xffffff, 'AC Milan': 0x1a1a1a, 'Ajax': 0xffffff, 'Dortmund': 0x1a1a1a, 'Porto': 0x1a1a1a };
+    const mJerseyColor = CLUB_COLORS[playerData && playerData.club] || 0x1565c0;
+    const mShortsColor = CLUB_SHORTS[playerData && playerData.club] || 0xffffff;
+    const mJerseyMat = new THREE.MeshLambertMaterial({ color: mJerseyColor });
+    const mShortsMat = new THREE.MeshLambertMaterial({ color: mShortsColor });
     const mPlayerGroup = new THREE.Group();
-
-    const mBody = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 1.5, 16), mPlayerMat);
-    mBody.position.y = 0.75; // base sits on pitch
-    mPlayerGroup.add(mBody);
-
-    const mHead = new THREE.Mesh(new THREE.SphereGeometry(0.35, 16, 16), mPlayerMat);
-    mHead.position.y = 1.85; // sits on top of cylinder
+    const SEG = 8;
+    const LEG_R = 0.09, LEG_H = 0.45, LEG_SPREAD = 0.13;
+    const TORSO_R = 0.32, TORSO_H = 0.7, SHORTS_H = 0.4, HEAD_R = 0.22;
+    const ARM_R = 0.07, ARM_H = 0.54;
+    // Legs + boots
+    const mBootMat = new THREE.MeshLambertMaterial({ color: 0x222222 });
+    const BOOT_H = 0.1, BOOT_R = LEG_R * 1.2;
+    [-LEG_SPREAD, LEG_SPREAD].forEach(ox => {
+      const leg = new THREE.Mesh(new THREE.CylinderGeometry(LEG_R, LEG_R * 0.85, LEG_H, SEG), mShortsMat);
+      leg.position.set(ox, LEG_H / 2, 0);
+      mPlayerGroup.add(leg);
+      const boot = new THREE.Mesh(new THREE.CylinderGeometry(BOOT_R, BOOT_R, BOOT_H, SEG), mBootMat);
+      boot.position.set(ox, BOOT_H / 2, 0);
+      mPlayerGroup.add(boot);
+    });
+    // Shorts
+    const mShorts = new THREE.Mesh(new THREE.CylinderGeometry(TORSO_R, TORSO_R * 0.9, SHORTS_H, SEG), mShortsMat);
+    mShorts.position.y = LEG_H + SHORTS_H / 2;
+    mPlayerGroup.add(mShorts);
+    // Jersey
+    const mJersey = new THREE.Mesh(new THREE.CylinderGeometry(TORSO_R * 0.95, TORSO_R, TORSO_H, SEG), mJerseyMat);
+    mJersey.position.y = LEG_H + SHORTS_H + TORSO_H / 2;
+    mPlayerGroup.add(mJersey);
+    // Arms — hang straight down beside torso
+    const shoulderY = LEG_H + SHORTS_H + TORSO_H * 0.75;
+    [-1, 1].forEach(side => {
+      const arm = new THREE.Mesh(new THREE.CylinderGeometry(ARM_R, ARM_R * 0.85, ARM_H, SEG), mJerseyMat);
+      arm.position.set(side * (TORSO_R + ARM_R * 0.6), shoulderY - ARM_H / 2 + 0.045, 0);
+      mPlayerGroup.add(arm);
+    });
+    // Head
+    const mHead = new THREE.Mesh(new THREE.SphereGeometry(HEAD_R, SEG, SEG),
+      new THREE.MeshLambertMaterial({ color: 0xd4a57a }));
+    mHead.position.y = LEG_H + SHORTS_H + TORSO_H + HEAD_R + 0.05;
     mPlayerGroup.add(mHead);
 
     mPlayerGroup.position.set(0, 0, 20); // start near near-end, facing far goal
     mScene.add(mPlayerGroup);
+
+    // AI opponent — static red capsule
+    const mAiGroup = new THREE.Group();
+    const aiMat = new THREE.MeshLambertMaterial({ color: 0xcc1111 });
+    const AI_R = 0.35, AI_H = 1.1, AI_SEG = 8;
+    const aiBody = new THREE.Mesh(new THREE.CylinderGeometry(AI_R, AI_R, AI_H, AI_SEG), aiMat);
+    aiBody.position.y = AI_R + AI_H / 2;
+    mAiGroup.add(aiBody);
+    const aiCapTop = new THREE.Mesh(new THREE.SphereGeometry(AI_R, AI_SEG, AI_SEG, 0, Math.PI * 2, 0, Math.PI / 2), aiMat);
+    aiCapTop.position.y = AI_R + AI_H;
+    mAiGroup.add(aiCapTop);
+    const aiCapBot = new THREE.Mesh(new THREE.SphereGeometry(AI_R, AI_SEG, AI_SEG, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), aiMat);
+    aiCapBot.position.y = AI_R;
+    mAiGroup.add(aiCapBot);
+    mAiGroup.position.set(0, 0, -20); // opposite end of pitch from player
+    mScene.add(mAiGroup);
 
     const M_SPEED = 0.12;
     const M_CAM_TARGET = new THREE.Vector3();
@@ -2232,8 +2303,8 @@
         const rx = Math.sin(mCamYaw + Math.PI / 2), rz = Math.cos(mCamYaw + Math.PI / 2);
         const wx = (mdz * fx + mdx * rx) / len * M_SPEED;
         const wz = (mdz * fz + mdx * rz) / len * M_SPEED;
-        mPlayerGroup.position.x = Math.max(-33.5, Math.min(33.5, mPlayerGroup.position.x + wx));
-        mPlayerGroup.position.z = Math.max(-52,   Math.min(52,   mPlayerGroup.position.z + wz));
+        mPlayerGroup.position.x = Math.max(-38.075, Math.min(38.075, mPlayerGroup.position.x + wx));
+        mPlayerGroup.position.z = Math.max(-56.575, Math.min(56.575, mPlayerGroup.position.z + wz));
         mPlayerGroup.rotation.y = Math.atan2(wx, wz);
       }
 
@@ -2253,8 +2324,8 @@
       mBall.position.z += mBallVel.z;
 
       // Pitch boundary walls
-      if (mBall.position.x < -34 + M_BALL_R)  { mBall.position.x = -34 + M_BALL_R;  mBallVel.x =  Math.abs(mBallVel.x); }
-      if (mBall.position.x >  34 - M_BALL_R)  { mBall.position.x =  34 - M_BALL_R;  mBallVel.x = -Math.abs(mBallVel.x); }
+      if (mBall.position.x < -38.425 + M_BALL_R)  { mBall.position.x = -38.425 + M_BALL_R;  mBallVel.x =  Math.abs(mBallVel.x); }
+      if (mBall.position.x >  38.425 - M_BALL_R)  { mBall.position.x =  38.425 - M_BALL_R;  mBallVel.x = -Math.abs(mBallVel.x); }
       const inGoalOpening = Math.abs(mBall.position.x) < GW / 2 && mBall.position.y < GH;
       if (mBall.position.z < -52.5 + M_BALL_R && !inGoalOpening) { mBall.position.z = -52.5 + M_BALL_R; mBallVel.z =  Math.abs(mBallVel.z); }
       if (mBall.position.z >  52.5 - M_BALL_R && !inGoalOpening) { mBall.position.z =  52.5 - M_BALL_R; mBallVel.z = -Math.abs(mBallVel.z); }
