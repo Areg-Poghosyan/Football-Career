@@ -2307,7 +2307,7 @@
     const tmHead = new THREE.Mesh(new THREE.SphereGeometry(HEAD_R, SEG, SEG), tmSkinMat);
     tmHead.position.y = LEG_H + SHORTS_H + TORSO_H + HEAD_R + 0.05;
     mTmGroup.add(tmHead);
-    const TM_HOME = { x: 15, z: 10 };
+    const TM_HOME = { x: 15, z: 5 };
     mTmGroup.position.set(TM_HOME.x, 0, TM_HOME.z);
     let mTmPassTimer = 0;
     mScene.add(mTmGroup);
@@ -2340,11 +2340,42 @@
     mTm2Group.position.set(TM2_HOME.x, 0, TM2_HOME.z);
     let mTm2PassTimer = 0;
     mScene.add(mTm2Group);
+
+    // CB teammate — centre-back, home at (0, -35), passes only (no shooting)
+    const mTm3Group = new THREE.Group();
+    const tm3JerseyMat = new THREE.MeshLambertMaterial({ color: mJerseyColor });
+    const tm3ShortsMat = new THREE.MeshLambertMaterial({ color: mShortsColor });
+    const tm3SkinMat   = new THREE.MeshLambertMaterial({ color: 0xd4a57a });
+    const tm3BootMat   = new THREE.MeshLambertMaterial({ color: 0x222222 });
+    [-LEG_SPREAD, LEG_SPREAD].forEach(ox => {
+      const leg = new THREE.Mesh(new THREE.CylinderGeometry(LEG_R, LEG_R * 0.85, LEG_H, SEG), tm3ShortsMat);
+      leg.position.set(ox, LEG_H / 2, 0); mTm3Group.add(leg);
+      const boot = new THREE.Mesh(new THREE.CylinderGeometry(BOOT_R, BOOT_R, BOOT_H, SEG), tm3BootMat);
+      boot.position.set(ox, BOOT_H / 2, 0); mTm3Group.add(boot);
+    });
+    const tm3Shorts = new THREE.Mesh(new THREE.CylinderGeometry(TORSO_R, TORSO_R * 0.9, SHORTS_H, SEG), tm3ShortsMat);
+    tm3Shorts.position.y = LEG_H + SHORTS_H / 2; mTm3Group.add(tm3Shorts);
+    const tm3Jersey = new THREE.Mesh(new THREE.CylinderGeometry(TORSO_R * 0.95, TORSO_R, TORSO_H, SEG), tm3JerseyMat);
+    tm3Jersey.position.y = LEG_H + SHORTS_H + TORSO_H / 2; mTm3Group.add(tm3Jersey);
+    const tm3ShoulderY = LEG_H + SHORTS_H + TORSO_H * 0.75;
+    [-1, 1].forEach(side => {
+      const arm = new THREE.Mesh(new THREE.CylinderGeometry(ARM_R, ARM_R * 0.85, ARM_H, SEG), tm3JerseyMat);
+      arm.position.set(side * (TORSO_R + ARM_R * 0.6), tm3ShoulderY - ARM_H / 2 + 0.045, 0);
+      mTm3Group.add(arm);
+    });
+    const tm3Head = new THREE.Mesh(new THREE.SphereGeometry(HEAD_R, SEG, SEG), tm3SkinMat);
+    tm3Head.position.y = LEG_H + SHORTS_H + TORSO_H + HEAD_R + 0.05; mTm3Group.add(tm3Head);
+    const TM3_HOME = { x: 0, z: 35 };
+    mTm3Group.position.set(TM3_HOME.x, 0, TM3_HOME.z);
+    let mTm3PassTimer = 0;
+    mScene.add(mTm3Group);
+
     // Previous positions for velocity estimation (predictive passing)
     const mPrev = {
       player: { x: 0, z: 20 },
       tm:     { x: TM_HOME.x,  z: TM_HOME.z },
       tm2:    { x: TM2_HOME.x, z: TM2_HOME.z },
+      tm3:    { x: TM3_HOME.x, z: TM3_HOME.z  },
     };
 
     const M_SPEED = 0.12;
@@ -2494,10 +2525,12 @@
         player: { x: mPlayerGroup.position.x - mPrev.player.x, z: mPlayerGroup.position.z - mPrev.player.z },
         tm:     { x: mTmGroup.position.x  - mPrev.tm.x,  z: mTmGroup.position.z  - mPrev.tm.z  },
         tm2:    { x: mTm2Group.position.x - mPrev.tm2.x, z: mTm2Group.position.z - mPrev.tm2.z },
+        tm3:    { x: mTm3Group.position.x - mPrev.tm3.x, z: mTm3Group.position.z - mPrev.tm3.z },
       };
       mPrev.player.x = mPlayerGroup.position.x; mPrev.player.z = mPlayerGroup.position.z;
       mPrev.tm.x     = mTmGroup.position.x;     mPrev.tm.z     = mTmGroup.position.z;
       mPrev.tm2.x    = mTm2Group.position.x;    mPrev.tm2.z    = mTm2Group.position.z;
+      mPrev.tm3.x    = mTm3Group.position.x;    mPrev.tm3.z    = mTm3Group.position.z;
 
       // Shared teammate helper — pass toward predicted position of closest target
       function tmPass(fromGroup, passTimer, setTimer) {
@@ -2505,6 +2538,7 @@
           { group: mPlayerGroup, vel: mVel.player },
           { group: mTmGroup,     vel: mVel.tm     },
           { group: mTm2Group,    vel: mVel.tm2    },
+          { group: mTm3Group,    vel: mVel.tm3    },
         ].filter(c => c.group !== fromGroup);
         let best = null, bestDist = Infinity;
         candidates.forEach(c => {
@@ -2550,12 +2584,16 @@
       const TM_ENGAGE = 18, TM_SPEED = 0.04;
       // Teammate 1
       mTmPassTimer = Math.max(0, mTmPassTimer - 1);
-      const tm1BallDist = tmMove(mTmGroup, TM_HOME, TM_ENGAGE, TM_SPEED);
+      const tm1BallDist = tmMove(mTmGroup, TM_HOME, 13, TM_SPEED);
       if (tm1BallDist <= 1.5 && mTmPassTimer === 0) tmPass(mTmGroup, mTmPassTimer, v => mTmPassTimer = v);
       // Teammate 2
       mTm2PassTimer = Math.max(0, mTm2PassTimer - 1);
       const tm2BallDist = tmMove(mTm2Group, TM2_HOME, TM_ENGAGE, TM_SPEED);
       if (tm2BallDist <= 1.5 && mTm2PassTimer === 0) tmPass(mTm2Group, mTm2PassTimer, v => mTm2PassTimer = v);
+      // CB — tight zone, pass only (no shoot)
+      mTm3PassTimer = Math.max(0, mTm3PassTimer - 1);
+      const tm3BallDist = tmMove(mTm3Group, TM3_HOME, 12, TM_SPEED);
+      if (tm3BallDist <= 1.5 && mTm3PassTimer === 0) tmPass(mTm3Group, mTm3PassTimer, v => mTm3PassTimer = v);
 
       updateMatchCamera();
       mRenderer.render(mScene, mCamera);
