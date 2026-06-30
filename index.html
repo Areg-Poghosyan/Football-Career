@@ -385,11 +385,107 @@
     #prematch-screen {
       position: fixed;
       inset: 0;
+      background: #050505;
+      z-index: 2;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+    #prematch-screen.active { display: flex; }
+
+    /* Tunnel built from a single SVG filling the screen */
+    #tunnel-svg {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    /* Glow at the tunnel exit */
+    #tunnel-glow {
+      position: absolute;
+      width: 120px;
+      height: 60px;
+      border-radius: 50%;
+      background: radial-gradient(ellipse, #ccffcc 0%, #00ff88 30%, transparent 70%);
+      filter: blur(18px);
+      animation: pulse 2s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 0.8; transform: scale(1); }
+      50%       { opacity: 1;   transform: scale(1.15); }
+    }
+
+    #prematch-lines {
+      position: absolute;
+      bottom: 18%;
+      left: 0;
+      right: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1.2rem;
+      padding: 0 2rem;
+      text-align: center;
+      pointer-events: none;
+    }
+    .prematch-line {
+      font-size: clamp(0.85rem, 2.2vw, 1.2rem);
+      font-weight: 400;
+      letter-spacing: 0.12em;
+      color: #fff;
+      opacity: 0;
+      transition: opacity 1.2s ease;
+    }
+    .prematch-line.visible { opacity: 1; }
+    #prematch-line-3 {
+      font-size: clamp(1.4rem, 4vw, 2.2rem);
+      font-weight: 900;
+      letter-spacing: 0.2em;
+      color: #00ff88;
+    }
+
+    #prematch-flash {
+      position: absolute;
+      inset: 0;
+      background: #00ff88;
+      opacity: 0;
+      pointer-events: none;
+      z-index: 7;
+      transition: opacity 0.15s ease;
+    }
+    #prematch-flash.flash { opacity: 1; }
+
+    #btn-kickoff {
+      position: absolute;
+      bottom: 8%;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 220px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.6s ease;
+      z-index: 8;
+      color: #00ff88;
+      border-color: #00ff88;
+    }
+    #btn-kickoff.visible {
+      opacity: 1;
+      pointer-events: all;
+    }
+
+    /* ── Match screen ───────────────────────────────────────── */
+    #match-screen {
+      position: fixed;
+      inset: 0;
       background: #0a0a0a;
       z-index: 2;
       display: none;
     }
-    #prematch-screen.active { display: block; }
+    #match-screen.active { display: block; }
+
+    /* Back button stays top-left */
 
     /* ── Training complete overlay ──────────────────────────── */
     #training-complete-overlay {
@@ -1095,6 +1191,47 @@
   <!-- Prematch screen -->
   <div id="prematch-screen">
     <button class="btn back-btn" onclick="showScreen('training')">← Back</button>
+
+    <!-- Tunnel: SVG trapezoid walls converging to a vanishing point -->
+    <svg id="tunnel-svg" viewBox="0 0 100 100" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+      <!-- Left wall -->
+      <polygon points="0,0 50,42 50,58 0,100" fill="#1a1a1a"/>
+      <!-- Right wall -->
+      <polygon points="100,0 50,42 50,58 100,100" fill="#1a1a1a"/>
+      <!-- Ceiling -->
+      <polygon points="0,0 100,0 50,42" fill="#111111"/>
+      <!-- Floor -->
+      <polygon points="0,100 100,100 50,58" fill="#0d0d0d"/>
+      <!-- Inner tunnel rings for depth -->
+      <polygon points="12,0  88,0  50,37 50,63" fill="none" stroke="#2a2a2a" stroke-width="0.4"/>
+      <polygon points="24,0  76,0  50,40 50,60" fill="none" stroke="#252525" stroke-width="0.35"/>
+      <polygon points="0,12  100,12 50,39 50,61 100,88 0,88" fill="none" stroke="#222" stroke-width="0.3"/>
+      <!-- Exit ellipse — bright green-white light -->
+      <ellipse cx="50" cy="50" rx="5" ry="3" fill="#e8ffe8"/>
+      <ellipse cx="50" cy="50" rx="8" ry="5" fill="none" stroke="#00ff88" stroke-width="0.6" opacity="0.7"/>
+      <ellipse cx="50" cy="50" rx="13" ry="8" fill="none" stroke="#00cc66" stroke-width="0.4" opacity="0.4"/>
+    </svg>
+
+    <!-- Soft glow over the exit -->
+    <div id="tunnel-glow"></div>
+
+    <!-- Dramatic text lines -->
+    <div id="prematch-lines">
+      <p class="prematch-line" id="prematch-line-1"></p>
+      <p class="prematch-line" id="prematch-line-2">The crowd roars. 90,000 fans. The biggest moment of their life.</p>
+      <p class="prematch-line" id="prematch-line-3">This is it.</p>
+    </div>
+
+    <!-- Green flash -->
+    <div id="prematch-flash"></div>
+
+    <!-- Kick Off button -->
+    <button class="btn" id="btn-kickoff">Kick Off</button>
+  </div>
+
+  <!-- Match screen -->
+  <div id="match-screen">
+    <button class="btn back-btn" onclick="showScreen('prematch')">← Back</button>
   </div>
 
   <!-- Coming-soon popup overlay -->
@@ -1205,10 +1342,11 @@
     const managerScreen     = document.getElementById('manager-screen');
     const trainingScreen    = document.getElementById('training-screen');
     const prematchScreen    = document.getElementById('prematch-screen');
+    const matchScreen       = document.getElementById('match-screen');
 
     function showScreen(name) {
       menuWrapper.style.display = 'none';
-      [careerScreen, originScreen, newspaperScreen, managerScreen, trainingScreen, prematchScreen].forEach(s => s.classList.remove('active'));
+      [careerScreen, originScreen, newspaperScreen, managerScreen, trainingScreen, prematchScreen, matchScreen].forEach(s => s.classList.remove('active'));
 
       if      (name === 'career')    careerScreen.classList.add('active');
       else if (name === 'origin')    originScreen.classList.add('active');
@@ -1216,6 +1354,7 @@
       else if (name === 'manager')   managerScreen.classList.add('active');
       else if (name === 'training')  trainingScreen.classList.add('active');
       else if (name === 'prematch')  prematchScreen.classList.add('active');
+      else if (name === 'match')     matchScreen.classList.add('active');
       else                           menuWrapper.style.display = 'flex'; // 'menu'
     }
 
@@ -1769,6 +1908,33 @@
         }));
       }
     };
+
+    // Hook into showScreen for prematch dramatic lines
+    const _showScreenPrematch = showScreen;
+    showScreen = function(name) {
+      _showScreenPrematch(name);
+      if (name === 'prematch') {
+        const lines = document.querySelectorAll('.prematch-line');
+        lines.forEach(l => l.classList.remove('visible'));
+        document.getElementById('prematch-line-1').textContent =
+          `${playerData.name} pulls on the ${playerData.club} shirt for the first time.`;
+        const flash   = document.getElementById('prematch-flash');
+        const kickoff = document.getElementById('btn-kickoff');
+        flash.classList.remove('flash');
+        kickoff.classList.remove('visible');
+        setTimeout(() => lines[0].classList.add('visible'), 400);
+        setTimeout(() => lines[1].classList.add('visible'), 2000);
+        setTimeout(() => lines[2].classList.add('visible'), 3800);
+        // Green flash then reveal button
+        setTimeout(() => flash.classList.add('flash'), 5200);
+        setTimeout(() => flash.classList.remove('flash'), 5550);
+        setTimeout(() => kickoff.classList.add('visible'), 5700);
+      }
+    };
+
+    document.getElementById('btn-kickoff').addEventListener('click', () => {
+      fadeToScreen('match');
+    });
 
     /* ── Animation loop — slow Y-axis rotation ──────────────── */
     function animate() {
