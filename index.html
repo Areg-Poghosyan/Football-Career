@@ -583,6 +583,93 @@
       color: #888;
     }
 
+    #training-drill {
+      padding: 0 1.25rem;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    #training-drill-label {
+      font-size: 0.65rem;
+      letter-spacing: 0.15em;
+      color: #aaa;
+      text-transform: uppercase;
+    }
+    #training-drill-status {
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 0.15em;
+      color: #00ff88;
+      text-transform: uppercase;
+      opacity: 0;
+      transition: opacity 0.4s ease;
+    }
+    #training-drill-status.visible { opacity: 1; }
+
+    #drill-progress {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0;
+      height: 44px;
+      flex-shrink: 0;
+      border-bottom: 1px solid #1a1a1a;
+      padding: 0 2rem;
+    }
+    .drill-step {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+    }
+    .drill-step-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      border: 2px solid #444;
+      background: transparent;
+      transition: background 0.3s ease, border-color 0.3s ease;
+    }
+    .drill-step.done .drill-step-dot {
+      background: #00ff88;
+      border-color: #00ff88;
+    }
+    .drill-step-label {
+      font-size: 0.5rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #444;
+      transition: color 0.3s ease;
+    }
+    .drill-step.done .drill-step-label { color: #00ff88; }
+    .drill-connector {
+      width: 60px;
+      height: 2px;
+      background: #222;
+      margin-bottom: 14px;
+      flex-shrink: 0;
+    }
+
+    #goal-flash {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: clamp(3rem, 12vw, 6rem);
+      font-weight: 900;
+      letter-spacing: 0.15em;
+      color: #fff;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.25s ease;
+      z-index: 5;
+    }
+    #goal-flash.visible { opacity: 1; }
+
     /* Pitch canvas fills all remaining space below the header */
     #training-canvas {
       flex: 1;
@@ -923,6 +1010,33 @@
       <span id="training-header-title">Training Ground</span>
       <span id="training-header-name"></span>
     </div>
+
+    <!-- Drill progress bar -->
+    <div id="drill-progress">
+      <div class="drill-step" id="drill-step-1">
+        <div class="drill-step-dot"></div>
+        <span class="drill-step-label">Drill 1</span>
+      </div>
+      <div class="drill-connector"></div>
+      <div class="drill-step" id="drill-step-2">
+        <div class="drill-step-dot"></div>
+        <span class="drill-step-label">Drill 2</span>
+      </div>
+      <div class="drill-connector"></div>
+      <div class="drill-step" id="drill-step-3">
+        <div class="drill-step-dot"></div>
+        <span class="drill-step-label">Drill 3</span>
+      </div>
+    </div>
+
+    <!-- Active drill instruction -->
+    <div id="training-drill">
+      <span id="training-drill-label">Drill 1 — Dribble through the cones!</span>
+      <span id="training-drill-status"></span>
+    </div>
+
+    <!-- GOAL! flash overlay -->
+    <div id="goal-flash">GOAL!</div>
 
     <!-- 2D pitch canvas -->
     <canvas id="training-canvas"></canvas>
@@ -1313,6 +1427,13 @@
       tCtx.beginPath();
       tCtx.arc(cx, midY, 3, 0, Math.PI * 2);
       tCtx.fill();
+
+      // ── Goal (top end) ────────────────────────────────────────
+      const goalW = (W - pad * 2) * 0.3;
+      const goalD = pad * 0.6;   // depth extends outside the pitch boundary
+      tCtx.strokeStyle = '#fff';
+      tCtx.lineWidth   = lw;
+      tCtx.strokeRect(cx - goalW / 2, pad - goalD, goalW, goalD);
     }
 
     // ── Player state ─────────────────────────────────────────────
@@ -1327,6 +1448,91 @@
     const tBall = { x: 0, y: 0, vx: 0, vy: 0 };
     const T_BALL_R  = 7;
     const T_FRICTION = 0.97;
+
+    // Cones: normalised [0,1] coords within the pitch, computed once on init
+    let tCones = [];
+
+    let tNextCone    = 0;   // index of the next cone the ball must reach
+    let tDrillDone   = false;
+    const CONE_TRIGGER = 28; // px — ball centre must come within this distance
+
+    const drillInstructionLabel = document.getElementById('training-drill-label');
+    const goalFlash = document.getElementById('goal-flash');
+    let goalFlashTimer = null;
+
+    const DRILL_INSTRUCTIONS = [
+      'Drill 1 — Dribble through the cones!',
+      'Drill 2 — Shoot the ball into the goal!',
+      'Drill 3 — Coming soon!',
+    ];
+
+    function completeDrill(n) {
+      document.getElementById('drill-step-' + n).classList.add('done');
+      if (n < 3) drillInstructionLabel.textContent = DRILL_INSTRUCTIONS[n];
+    }
+
+    function initCones(W, H, pad) {
+      const pitchW = W - pad * 2, pitchH = H - pad * 2;
+      const cx = W / 2;
+      const offset = pitchW * 0.07;
+      tCones = [0.2, 0.35, 0.5, 0.65, 0.8].map((t, i) => ({
+        x: cx + (i % 2 === 0 ? -offset : offset),
+        y: pad + t * pitchH,
+      }));
+      tNextCone  = 0;
+      tDrillDone = false;
+      tDrill2Done = false;
+      [1, 2, 3].forEach(n => document.getElementById('drill-step-' + n).classList.remove('done'));
+      drillInstructionLabel.textContent = DRILL_INSTRUCTIONS[0];
+      goalFlash.classList.remove('visible');
+    }
+
+    function checkConeProgress() {
+      if (tDrillDone || tNextCone >= tCones.length) return;
+      const c  = tCones[tNextCone];
+      const dx = tBall.x - c.x, dy = tBall.y - c.y;
+      if (Math.sqrt(dx * dx + dy * dy) < CONE_TRIGGER) {
+        tNextCone++;
+        if (tNextCone >= tCones.length) {
+          tDrillDone = true;
+          completeDrill(1);
+        }
+      }
+    }
+
+    let tDrill2Done = false;
+
+    function checkGoal() {
+      if (tDrill2Done) return;
+      const W   = trainingCanvas.width;
+      const H   = trainingCanvas.height;
+      const pad = Math.min(W, H) * 0.07;
+      const cx  = W / 2;
+      const goalW = (W - pad * 2) * 0.3;
+      const goalD = pad * 0.6;
+      if (
+        tBall.x - T_BALL_R >= cx - goalW / 2 &&
+        tBall.x + T_BALL_R <= cx + goalW / 2 &&
+        tBall.y - T_BALL_R <= pad &&
+        tBall.y + T_BALL_R >= pad - goalD
+      ) {
+        tBall.x = W / 2 + 60; tBall.y = H / 2; tBall.vx = 0; tBall.vy = 0;
+        goalFlash.classList.add('visible');
+        clearTimeout(goalFlashTimer);
+        goalFlashTimer = setTimeout(() => goalFlash.classList.remove('visible'), 2000);
+        tDrill2Done = true;
+        completeDrill(2);
+      }
+    }
+
+    function drawCones() {
+      tCones.forEach((c, i) => {
+        tCtx.beginPath();
+        tCtx.arc(c.x, c.y, 5, 0, Math.PI * 2);
+        tCtx.fillStyle = i < tNextCone ? '#885500' : '#ff6a00';
+        tCtx.fill();
+      });
+    }
 
     function drawBall() {
       tCtx.beginPath();
@@ -1381,7 +1587,10 @@
         tBall.vy = ny * T_SPEED * 2.5;
       }
 
+      checkConeProgress();
+      checkGoal();
       drawTrainingPitch();
+      drawCones();
       drawBall();
       drawPlayer();
 
@@ -1390,7 +1599,11 @@
 
     // Redraw on resize so the pitch always fills the available space
     window.addEventListener('resize', () => {
-      if (trainingScreen.classList.contains('active')) { drawTrainingPitch(); drawBall(); drawPlayer(); }
+      if (trainingScreen.classList.contains('active')) {
+        const W = trainingCanvas.offsetWidth, H = trainingCanvas.offsetHeight, pad = Math.min(W, H) * 0.07;
+        initCones(W, H, pad);
+        drawTrainingPitch(); drawCones(); drawBall(); drawPlayer();
+      }
     });
 
     // Hook into showScreen to populate the header and draw the pitch
@@ -1400,13 +1613,13 @@
       if (name === 'training') {
         document.getElementById('training-header-name').textContent = playerData.name || '';
         requestAnimationFrame(() => requestAnimationFrame(() => {
-          tPlayer.x = trainingCanvas.offsetWidth  / 2;
-          tPlayer.y = trainingCanvas.offsetHeight / 2;
-          tBall.x   = trainingCanvas.offsetWidth  / 2 + 60;
-          tBall.y   = trainingCanvas.offsetHeight / 2;
-          drawTrainingPitch();
-          drawBall();
-          drawPlayer();
+          const W = trainingCanvas.offsetWidth, H = trainingCanvas.offsetHeight, pad = Math.min(W, H) * 0.07;
+          tPlayer.x = W / 2;
+          tPlayer.y = H / 2;
+          tBall.x   = W / 2 + 60;
+          tBall.y   = H / 2;
+          initCones(W, H, pad);
+          drawTrainingPitch(); drawCones(); drawBall(); drawPlayer();
           if (!tLoopId) trainingLoop();
         }));
       }
