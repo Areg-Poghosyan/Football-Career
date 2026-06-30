@@ -381,6 +381,47 @@
       background: rgba(0, 255, 136, 0.12);
     }
 
+    /* ── Prematch screen ────────────────────────────────────── */
+    #prematch-screen {
+      position: fixed;
+      inset: 0;
+      background: #0a0a0a;
+      z-index: 2;
+      display: none;
+    }
+    #prematch-screen.active { display: block; }
+
+    /* ── Training complete overlay ──────────────────────────── */
+    #training-complete-overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0,0,0,0.6);
+      z-index: 6;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.5s ease;
+    }
+    #training-complete-overlay.visible {
+      opacity: 1;
+      pointer-events: all;
+    }
+    #training-complete-box {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 24px;
+    }
+    #training-complete-title {
+      font-size: clamp(1.4rem, 5vw, 2.4rem);
+      font-weight: 900;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #00ff88;
+    }
+
     /* Hidden utility */
     .hidden { display: none !important; }
 
@@ -1038,9 +1079,22 @@
     <!-- GOAL! flash overlay -->
     <div id="goal-flash">GOAL!</div>
 
+    <!-- Training complete overlay -->
+    <div id="training-complete-overlay">
+      <div id="training-complete-box">
+        <div id="training-complete-title">Training Complete!</div>
+        <button class="btn" id="btn-training-continue">Continue</button>
+      </div>
+    </div>
+
     <!-- 2D pitch canvas -->
     <canvas id="training-canvas"></canvas>
 
+  </div>
+
+  <!-- Prematch screen -->
+  <div id="prematch-screen">
+    <button class="btn back-btn" onclick="showScreen('training')">← Back</button>
   </div>
 
   <!-- Coming-soon popup overlay -->
@@ -1150,16 +1204,18 @@
     const newspaperScreen   = document.getElementById('newspaper-screen');
     const managerScreen     = document.getElementById('manager-screen');
     const trainingScreen    = document.getElementById('training-screen');
+    const prematchScreen    = document.getElementById('prematch-screen');
 
     function showScreen(name) {
       menuWrapper.style.display = 'none';
-      [careerScreen, originScreen, newspaperScreen, managerScreen, trainingScreen].forEach(s => s.classList.remove('active'));
+      [careerScreen, originScreen, newspaperScreen, managerScreen, trainingScreen, prematchScreen].forEach(s => s.classList.remove('active'));
 
       if      (name === 'career')    careerScreen.classList.add('active');
       else if (name === 'origin')    originScreen.classList.add('active');
       else if (name === 'newspaper') newspaperScreen.classList.add('active');
       else if (name === 'manager')   managerScreen.classList.add('active');
       else if (name === 'training')  trainingScreen.classList.add('active');
+      else if (name === 'prematch')  prematchScreen.classList.add('active');
       else                           menuWrapper.style.display = 'flex'; // 'menu'
     }
 
@@ -1465,13 +1521,21 @@
     const DRILL_INSTRUCTIONS = [
       'Drill 1 — Dribble through the cones!',
       'Drill 2 — Shoot the ball into the goal!',
-      'Drill 3 — Coming soon!',
+      'Drill 3 — Intercept the ball and shoot it into the goal!',
     ];
+
+    const trainingCompleteOverlay = document.getElementById('training-complete-overlay');
+
+    document.getElementById('btn-training-continue').addEventListener('click', () => {
+      fadeToScreen('prematch');
+      trainingCompleteOverlay.classList.remove('visible');
+    });
 
     function completeDrill(n) {
       document.getElementById('drill-step-' + n).classList.add('done');
       if (n < 3) drillInstructionLabel.textContent = DRILL_INSTRUCTIONS[n];
       if (n === 2) spawnD3Ball();
+      if (n === 3) setTimeout(() => trainingCompleteOverlay.classList.add('visible'), 800);
     }
 
     function initCones(W, H, pad) {
@@ -1490,6 +1554,7 @@
       [1, 2, 3].forEach(n => document.getElementById('drill-step-' + n).classList.remove('done'));
       drillInstructionLabel.textContent = DRILL_INSTRUCTIONS[0];
       goalFlash.classList.remove('visible');
+      trainingCompleteOverlay.classList.remove('visible');
     }
 
     function checkConeProgress() {
@@ -1512,33 +1577,32 @@
 
     let tDrill2Done = false;
     let tDrill3Done = false;
-    const tD3Ball   = { x: 0, y: 0, vx: 0, vy: 0, active: false };
-    const D3_ROLL   = 0.8; // px per frame — slow incoming roll
+    const tD3Ball = { x: 0, y: 0, vx: 0, vy: 0, active: false };
 
     function spawnD3Ball() {
       const W   = trainingCanvas.width;
       const H   = trainingCanvas.height;
       const pad = Math.min(W, H) * 0.07;
-      tD3Ball.x      = W / 2 + (Math.random() - 0.5) * (W - pad * 2) * 0.4;
-      tD3Ball.y      = pad + T_BALL_R + 4;
+      // Spawn just above the player (near bottom), slightly to the side, rolling down toward them
+      tD3Ball.x      = tPlayer.x + 80;
+      tD3Ball.y      = tPlayer.y - 120;
       tD3Ball.vx     = 0;
-      tD3Ball.vy     = D3_ROLL;
+      tD3Ball.vy     = 3.5; // fast roll downward toward player
       tD3Ball.active = true;
     }
 
     function updateD3Ball(W, H, pad) {
       if (!tD3Ball.active || tDrill3Done) return;
 
-      // Spawn on first frame after drill 2 done
-      if (!tD3Ball.active) return;
-
       tD3Ball.vx *= T_FRICTION;
       tD3Ball.vy *= T_FRICTION;
-      // Re-apply roll if nearly stopped (keeps it moving toward player)
-      if (Math.abs(tD3Ball.vy) < D3_ROLL * 0.5) tD3Ball.vy = D3_ROLL;
 
-      tD3Ball.x = Math.max(pad + T_BALL_R, Math.min(W - pad - T_BALL_R, tD3Ball.x + tD3Ball.vx));
-      tD3Ball.y = Math.max(pad + T_BALL_R, Math.min(H - pad - T_BALL_R, tD3Ball.y + tD3Ball.vy));
+      tD3Ball.x += tD3Ball.vx;
+      tD3Ball.y += tD3Ball.vy;
+      if (tD3Ball.x < pad + T_BALL_R)     { tD3Ball.x = pad + T_BALL_R;     tD3Ball.vx = Math.abs(tD3Ball.vx); }
+      if (tD3Ball.x > W - pad - T_BALL_R) { tD3Ball.x = W - pad - T_BALL_R; tD3Ball.vx = -Math.abs(tD3Ball.vx); }
+      if (tD3Ball.y < pad + T_BALL_R)     { tD3Ball.y = pad + T_BALL_R;     tD3Ball.vy = Math.abs(tD3Ball.vy); }
+      if (tD3Ball.y > H - pad - T_BALL_R) { tD3Ball.y = H - pad - T_BALL_R; tD3Ball.vy = -Math.abs(tD3Ball.vy); }
 
       // Player collision — kick it
       const colDist = T_R + T_BALL_R;
@@ -1554,7 +1618,7 @@
 
       // Goal check for d3 ball
       const cx    = W / 2;
-      const goalW = (W - pad * 2) * 0.3;
+      const goalW = (W - pad * 2) * 0.15;
       const goalD = pad * 0.6;
       if (
         tD3Ball.x - T_BALL_R >= cx - goalW / 2 &&
@@ -1577,7 +1641,7 @@
       const H   = trainingCanvas.height;
       const pad = Math.min(W, H) * 0.07;
       const cx  = W / 2;
-      const goalW = (W - pad * 2) * 0.3;
+      const goalW = (W - pad * 2) * 0.15;
       const goalD = pad * 0.6;
       if (
         tBall.x - T_BALL_R >= cx - goalW / 2 &&
@@ -1641,8 +1705,12 @@
       // Ball physics
       tBall.vx *= T_FRICTION;
       tBall.vy *= T_FRICTION;
-      tBall.x = Math.max(pad + T_BALL_R, Math.min(W - pad - T_BALL_R, tBall.x + tBall.vx));
-      tBall.y = Math.max(pad + T_BALL_R, Math.min(H - pad - T_BALL_R, tBall.y + tBall.vy));
+      tBall.x += tBall.vx;
+      tBall.y += tBall.vy;
+      if (tBall.x < pad + T_BALL_R)       { tBall.x = pad + T_BALL_R;       tBall.vx = Math.abs(tBall.vx); }
+      if (tBall.x > W - pad - T_BALL_R)   { tBall.x = W - pad - T_BALL_R;   tBall.vx = -Math.abs(tBall.vx); }
+      if (tBall.y < pad + T_BALL_R)       { tBall.y = pad + T_BALL_R;       tBall.vy = Math.abs(tBall.vy); }
+      if (tBall.y > H - pad - T_BALL_R)   { tBall.y = H - pad - T_BALL_R;   tBall.vy = -Math.abs(tBall.vy); }
 
       // Player–ball collision
       const colDist = T_R + T_BALL_R;
