@@ -2031,6 +2031,54 @@
     addGoal(-52.5); // near end
     addGoal( 52.5); // far end
 
+    // Ball — white sphere at pitch centre
+    const mBall = new THREE.Mesh(
+      new THREE.SphereGeometry(0.22, 16, 16),
+      new THREE.MeshLambertMaterial({ color: 0xffffff })
+    );
+    mBall.position.set(0, 0.22, 0);
+    mScene.add(mBall);
+    const mBallVel = { x: 0, z: 0 };
+
+    // Player capsule — cylinder body + sphere top, blue
+    const mPlayerMat = new THREE.MeshLambertMaterial({ color: 0x1565c0 });
+    const mPlayerGroup = new THREE.Group();
+
+    const mBody = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 1.5, 16), mPlayerMat);
+    mBody.position.y = 0.75; // base sits on pitch
+    mPlayerGroup.add(mBody);
+
+    const mHead = new THREE.Mesh(new THREE.SphereGeometry(0.35, 16, 16), mPlayerMat);
+    mHead.position.y = 1.85; // sits on top of cylinder
+    mPlayerGroup.add(mHead);
+
+    mPlayerGroup.position.set(0, 0, 20); // start near near-end, facing far goal
+    mScene.add(mPlayerGroup);
+
+    const M_SPEED = 0.12;
+    const M_CAM_TARGET = new THREE.Vector3();
+    let mCamYaw   = Math.PI; // start facing toward far goal
+    let mCamPitch = 0.3;     // slight downward tilt
+    const M_CAM_DIST = 7;
+    const M_CAM_H    = 3.5;
+
+    document.addEventListener('mousemove', e => {
+      if (document.pointerLockElement !== matchCanvas) return;
+      mCamYaw   -= e.movementX * 0.002;
+      mCamPitch  = Math.max(0.05, Math.min(1.2, mCamPitch + e.movementY * 0.002));
+    });
+
+    function updateMatchCamera() {
+      // Orbit camera around player using yaw + pitch
+      const cx = mPlayerGroup.position.x + Math.sin(mCamYaw) * Math.cos(mCamPitch) * M_CAM_DIST;
+      const cy = mPlayerGroup.position.y + M_CAM_H + Math.sin(mCamPitch) * M_CAM_DIST;
+      const cz = mPlayerGroup.position.z + Math.cos(mCamYaw) * Math.cos(mCamPitch) * M_CAM_DIST;
+      M_CAM_TARGET.set(cx, cy, cz);
+      mCamera.position.lerp(M_CAM_TARGET, 0.12);
+      mCamera.lookAt(mPlayerGroup.position.x, 1, mPlayerGroup.position.z);
+    }
+    updateMatchCamera();
+
     function resizeMatchRenderer() {
       const W = matchScreen.offsetWidth, H = matchScreen.offsetHeight;
       mRenderer.setSize(W, H);
@@ -2041,9 +2089,56 @@
     let mLoopId = null;
     function matchLoop() {
       if (!matchScreen.classList.contains('active')) { mLoopId = null; return; }
+
+      // Player movement in local XZ
+      let mdx = 0, mdz = 0;
+      if (tKeys['w'] || tKeys['W'] || tKeys['ArrowUp'])    mdz -= 1;
+      if (tKeys['s'] || tKeys['S'] || tKeys['ArrowDown'])  mdz += 1;
+      if (tKeys['a'] || tKeys['A'] || tKeys['ArrowLeft'])  mdx -= 1;
+      if (tKeys['d'] || tKeys['D'] || tKeys['ArrowRight']) mdx += 1;
+
+      if (mdx !== 0 || mdz !== 0) {
+        const len = Math.sqrt(mdx * mdx + mdz * mdz);
+        const fx = Math.sin(mCamYaw), fz = Math.cos(mCamYaw);
+        const rx = Math.sin(mCamYaw + Math.PI / 2), rz = Math.cos(mCamYaw + Math.PI / 2);
+        const wx = (mdz * fx + mdx * rx) / len * M_SPEED;
+        const wz = (mdz * fz + mdx * rz) / len * M_SPEED;
+        mPlayerGroup.position.x = Math.max(-33.5, Math.min(33.5, mPlayerGroup.position.x + wx));
+        mPlayerGroup.position.z = Math.max(-52,   Math.min(52,   mPlayerGroup.position.z + wz));
+        mPlayerGroup.rotation.y = Math.atan2(wx, wz);
+      }
+
+      // Ball physics
+      mBallVel.x *= 0.97;
+      mBallVel.z *= 0.97;
+      mBall.position.x += mBallVel.x;
+      mBall.position.z += mBallVel.z;
+
+      // Player–ball collision
+      const MB_RADIUS  = 0.22;
+      const MP_RADIUS  = 0.35;
+      const MB_COL_DIST = MB_RADIUS + MP_RADIUS;
+      const bdx = mBall.position.x - mPlayerGroup.position.x;
+      const bdz = mBall.position.z - mPlayerGroup.position.z;
+      const bdist = Math.sqrt(bdx * bdx + bdz * bdz);
+      if (bdist < MB_COL_DIST && bdist > 0) {
+        const nx = bdx / bdist, nz = bdz / bdist;
+        mBall.position.x = mPlayerGroup.position.x + nx * MB_COL_DIST;
+        mBall.position.z = mPlayerGroup.position.z + nz * MB_COL_DIST;
+        mBallVel.x = nx * M_SPEED * 6;
+        mBallVel.z = nz * M_SPEED * 6;
+      }
+
+      updateMatchCamera();
       mRenderer.render(mScene, mCamera);
       mLoopId = requestAnimationFrame(matchLoop);
     }
+
+    // Pointer lock
+    matchCanvas.addEventListener('click', () => matchCanvas.requestPointerLock());
+    document.addEventListener('pointerlockchange', () => {
+      matchCanvas.style.cursor = document.pointerLockElement === matchCanvas ? 'none' : 'default';
+    });
 
     // Hook showScreen to start/stop the match render loop
     const _showScreenMatch = showScreen;
