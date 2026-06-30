@@ -485,6 +485,28 @@
     }
     #match-screen.active { display: block; }
 
+    #power-bar-wrap {
+      position: absolute;
+      bottom: 2rem;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 160px;
+      height: 10px;
+      background: rgba(255,255,255,0.15);
+      border: 1px solid rgba(255,255,255,0.3);
+      border-radius: 5px;
+      overflow: hidden;
+      pointer-events: none;
+      z-index: 5;
+    }
+    #power-bar-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(to right, #00ff88, #ff4444);
+      border-radius: 5px;
+      transition: background 0.1s;
+    }
+
     /* Back button stays top-left */
 
     /* ── Training complete overlay ──────────────────────────── */
@@ -1233,6 +1255,7 @@
   <div id="match-screen">
     <button class="btn back-btn" onclick="showScreen('prematch')" style="position:relative;z-index:1;">← Back</button>
     <canvas id="match-canvas" style="position:absolute;inset:0;width:100%;height:100%;display:block;"></canvas>
+    <div id="power-bar-wrap"><div id="power-bar-fill"></div></div>
   </div>
 
   <!-- Coming-soon popup overlay -->
@@ -2038,7 +2061,9 @@
     );
     mBall.position.set(0, 0.22, 0);
     mScene.add(mBall);
-    const mBallVel = { x: 0, z: 0 };
+    const mBallVel = { x: 0, y: 0, z: 0 };
+    const M_GRAVITY = 0.012;
+    const M_BALL_R  = 0.22;
 
     // Player capsule — cylinder body + sphere top, blue
     const mPlayerMat = new THREE.MeshLambertMaterial({ color: 0x1565c0 });
@@ -2108,31 +2133,97 @@
         mPlayerGroup.rotation.y = Math.atan2(wx, wz);
       }
 
-      // Ball physics
-      mBallVel.x *= 0.97;
-      mBallVel.z *= 0.97;
+      // Power bar — fill while M1 held
+      if (mMouseDown || mMouseDown2) mPower = Math.min(100, mPower + 1.8);
+      mPowerFill.style.width = mPower + '%';
+
+      // Ball physics — gravity + friction
+      mBallVel.y -= M_GRAVITY;
       mBall.position.x += mBallVel.x;
+      mBall.position.y += mBallVel.y;
       mBall.position.z += mBallVel.z;
 
-      // Player–ball collision
-      const MB_RADIUS  = 0.22;
-      const MP_RADIUS  = 0.35;
-      const MB_COL_DIST = MB_RADIUS + MP_RADIUS;
+      // Pitch boundary walls
+      if (mBall.position.x < -34 + M_BALL_R)  { mBall.position.x = -34 + M_BALL_R;  mBallVel.x =  Math.abs(mBallVel.x); }
+      if (mBall.position.x >  34 - M_BALL_R)  { mBall.position.x =  34 - M_BALL_R;  mBallVel.x = -Math.abs(mBallVel.x); }
+      if (mBall.position.z < -52.5 + M_BALL_R){ mBall.position.z = -52.5 + M_BALL_R; mBallVel.z =  Math.abs(mBallVel.z); }
+      if (mBall.position.z >  52.5 - M_BALL_R){ mBall.position.z =  52.5 - M_BALL_R; mBallVel.z = -Math.abs(mBallVel.z); }
+
+      // Ground bounce / rolling friction
+      if (mBall.position.y <= M_BALL_R) {
+        mBall.position.y = M_BALL_R;
+        if (mBallVel.y < -0.02) {
+          mBallVel.y = -mBallVel.y * 0.55; // bounce
+        } else {
+          mBallVel.y = 0; // come to rest on ground
+        }
+        mBallVel.x *= 0.985; // rolling friction only while on ground
+        mBallVel.z *= 0.985;
+      }
+
+      // Player–ball collision (XZ only, treat ball as always reachable vertically when on ground)
+      const MP_RADIUS   = 0.35;
+      const MB_COL_DIST = M_BALL_R + MP_RADIUS;
       const bdx = mBall.position.x - mPlayerGroup.position.x;
       const bdz = mBall.position.z - mPlayerGroup.position.z;
       const bdist = Math.sqrt(bdx * bdx + bdz * bdz);
-      if (bdist < MB_COL_DIST && bdist > 0) {
+      if (bdist < MB_COL_DIST && bdist > 0 && mBall.position.y < 1.5) {
         const nx = bdx / bdist, nz = bdz / bdist;
         mBall.position.x = mPlayerGroup.position.x + nx * MB_COL_DIST;
         mBall.position.z = mPlayerGroup.position.z + nz * MB_COL_DIST;
-        mBallVel.x = nx * M_SPEED * 6;
-        mBallVel.z = nz * M_SPEED * 6;
+        const mTouchMult = (mdx !== 0 || mdz !== 0) ? 0.46 : 0.4;
+        mBallVel.x = nx * M_SPEED * mTouchMult;
+        mBallVel.z = nz * M_SPEED * mTouchMult;
       }
 
       updateMatchCamera();
       mRenderer.render(mScene, mCamera);
       mLoopId = requestAnimationFrame(matchLoop);
     }
+
+    // Power bar + shoot
+    let mPower = 0, mMouseDown = false, mMouseDown2 = false;
+    const mPowerFill = document.getElementById('power-bar-fill');
+    const M_SHOOT_RANGE = 3.5;
+
+    document.addEventListener('mousedown', e => {
+      if (document.pointerLockElement !== matchCanvas) return;
+      if (e.button === 0) mMouseDown = true;
+      if (e.button === 2) mMouseDown2 = true;
+    });
+    document.addEventListener('mouseup', e => {
+      if (e.button === 0) {
+        mMouseDown = false;
+        if (mPower) {
+          const sdx = mBall.position.x - mPlayerGroup.position.x;
+          const sdz = mBall.position.z - mPlayerGroup.position.z;
+          if (Math.sqrt(sdx * sdx + sdz * sdz) < M_SHOOT_RANGE) {
+            const t = mPower / 100;
+            const fwd = Math.min(t * 1.4, 0.9);
+            mBallVel.x = -Math.sin(mCamYaw) * fwd;
+            mBallVel.z = -Math.cos(mCamYaw) * fwd;
+            mBallVel.y =  Math.pow(t, 1.5) * 0.28;
+            mBall.position.y = M_BALL_R + 0.01;
+          }
+          mPower = 0;
+        }
+      }
+      if (e.button === 2) {
+        mMouseDown2 = false;
+        if (mPower) {
+          const sdx = mBall.position.x - mPlayerGroup.position.x;
+          const sdz = mBall.position.z - mPlayerGroup.position.z;
+          if (Math.sqrt(sdx * sdx + sdz * sdz) < M_SHOOT_RANGE) {
+            const t = mPower / 100;
+            mBallVel.x = -Math.sin(mCamYaw) * t * 1.0;
+            mBallVel.z = -Math.cos(mCamYaw) * t * 1.0;
+            mBallVel.y = 0;
+            console.log('[M2] power:', mPower.toFixed(1), 't:', t.toFixed(2), 'vel:', mBallVel.x.toFixed(3), mBallVel.z.toFixed(3));
+          }
+          mPower = 0;
+        }
+      }
+    });
 
     // Pointer lock
     matchCanvas.addEventListener('click', () => matchCanvas.requestPointerLock());
