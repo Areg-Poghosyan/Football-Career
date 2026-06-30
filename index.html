@@ -2273,9 +2273,44 @@
     const aiHead = new THREE.Mesh(new THREE.SphereGeometry(ai_HEAD_R, SEG, SEG), aiSkinMat);
     aiHead.position.y = ai_LEG_H + ai_SHORTS_H + ai_TORSO_H + ai_HEAD_R + 0.05;
     mAiGroup.add(aiHead);
-    mAiGroup.position.set(0, 0, -20); // opposite end of pitch from player
+    const AI_HOME = { x: 0, z: -20 };
+    mAiGroup.position.set(AI_HOME.x, 0, AI_HOME.z);
     let mAiTouchTimer = 0;
     mScene.add(mAiGroup);
+
+    // Teammate — same humanoid, distinct yellow-green kit, static for now
+    const mTmGroup = new THREE.Group();
+    const tmJerseyMat = new THREE.MeshLambertMaterial({ color: mJerseyColor });
+    const tmShortsMat = new THREE.MeshLambertMaterial({ color: mShortsColor });
+    const tmSkinMat   = new THREE.MeshLambertMaterial({ color: 0xd4a57a });
+    const tmBootMat   = new THREE.MeshLambertMaterial({ color: 0x222222 });
+    [-LEG_SPREAD, LEG_SPREAD].forEach(ox => {
+      const leg = new THREE.Mesh(new THREE.CylinderGeometry(LEG_R, LEG_R * 0.85, LEG_H, SEG), tmShortsMat);
+      leg.position.set(ox, LEG_H / 2, 0);
+      mTmGroup.add(leg);
+      const boot = new THREE.Mesh(new THREE.CylinderGeometry(BOOT_R, BOOT_R, BOOT_H, SEG), tmBootMat);
+      boot.position.set(ox, BOOT_H / 2, 0);
+      mTmGroup.add(boot);
+    });
+    const tmShorts = new THREE.Mesh(new THREE.CylinderGeometry(TORSO_R, TORSO_R * 0.9, SHORTS_H, SEG), tmShortsMat);
+    tmShorts.position.y = LEG_H + SHORTS_H / 2;
+    mTmGroup.add(tmShorts);
+    const tmJersey = new THREE.Mesh(new THREE.CylinderGeometry(TORSO_R * 0.95, TORSO_R, TORSO_H, SEG), tmJerseyMat);
+    tmJersey.position.y = LEG_H + SHORTS_H + TORSO_H / 2;
+    mTmGroup.add(tmJersey);
+    const tmShoulderY = LEG_H + SHORTS_H + TORSO_H * 0.75;
+    [-1, 1].forEach(side => {
+      const arm = new THREE.Mesh(new THREE.CylinderGeometry(ARM_R, ARM_R * 0.85, ARM_H, SEG), tmJerseyMat);
+      arm.position.set(side * (TORSO_R + ARM_R * 0.6), tmShoulderY - ARM_H / 2 + 0.045, 0);
+      mTmGroup.add(arm);
+    });
+    const tmHead = new THREE.Mesh(new THREE.SphereGeometry(HEAD_R, SEG, SEG), tmSkinMat);
+    tmHead.position.y = LEG_H + SHORTS_H + TORSO_H + HEAD_R + 0.05;
+    mTmGroup.add(tmHead);
+    const TM_HOME = { x: 15, z: 10 };
+    mTmGroup.position.set(TM_HOME.x, 0, TM_HOME.z);
+    let mTmPassTimer = 0;
+    mScene.add(mTmGroup);
 
     const M_SPEED = 0.12;
     const M_CAM_TARGET = new THREE.Vector3();
@@ -2380,34 +2415,81 @@
       }
 
       // AI — chase ball, kick toward player goal when close
-      // AI dribble logic
-      const AI_SPEED = 0.055, AI_DRIBBLE_DIST = 1.4, AI_SHOOT_Z = -32;
+      // AI dribble logic — only engage when ball is within home zone
+      const AI_SPEED = 0.055, AI_DRIBBLE_DIST = 1.4, AI_SHOOT_Z = -32, AI_ENGAGE = 22;
+      const aiBallHomeDx = mBall.position.x - AI_HOME.x;
+      const aiBallHomeDz = mBall.position.z - AI_HOME.z;
+      const aiBallHomeDist = Math.sqrt(aiBallHomeDx * aiBallHomeDx + aiBallHomeDz * aiBallHomeDz);
       const aidx = mBall.position.x - mAiGroup.position.x;
       const aidz = mBall.position.z - mAiGroup.position.z;
       const aidist = Math.sqrt(aidx * aidx + aidz * aidz);
       mAiTouchTimer = Math.max(0, mAiTouchTimer - 1);
-      if (aidist <= AI_DRIBBLE_DIST) {
-        // Close to ball — dribble toward goal or shoot
-        if (mAiGroup.position.z < AI_SHOOT_Z) {
-          // In shooting range — strike toward goal
-          mBallVel.x = (Math.random() - 0.5) * 0.25;
-          mBallVel.z = -1.1;
-          mBallVel.y = 0.12;
-          mAiTouchTimer = 90; // back off after shot
-        } else if (mAiTouchTimer === 0) {
-          // Gentle touch — nudge ball toward goal, AI advances
-          mBallVel.x += (-mBall.position.x * 0.03);  // nudge toward centre
-          mBallVel.z = -0.22;
-          mBallVel.y = 0.03;
-          mAiTouchTimer = 22;
+      if (aiBallHomeDist < AI_ENGAGE) {
+        if (aidist <= AI_DRIBBLE_DIST) {
+          if (mAiGroup.position.z < AI_SHOOT_Z) {
+            mBallVel.x = (Math.random() - 0.5) * 0.25;
+            mBallVel.z = -1.1;
+            mBallVel.y = 0.12;
+            mAiTouchTimer = 90;
+          } else if (mAiTouchTimer === 0) {
+            mBallVel.x += (-mBall.position.x * 0.03);
+            mBallVel.z = -0.22;
+            mBallVel.y = 0.03;
+            mAiTouchTimer = 22;
+          }
+          mAiGroup.position.z -= AI_SPEED * 0.9;
+          mAiGroup.position.x += (mBall.position.x - mAiGroup.position.x) * 0.05;
+        } else {
+          mAiGroup.position.x += (aidx / aidist) * AI_SPEED;
+          mAiGroup.position.z += (aidz / aidist) * AI_SPEED;
         }
-        // AI body follows ball toward goal
-        mAiGroup.position.z -= AI_SPEED * 0.9;
-        mAiGroup.position.x += (mBall.position.x - mAiGroup.position.x) * 0.05;
       } else {
-        // Chase ball
-        mAiGroup.position.x += (aidx / aidist) * AI_SPEED;
-        mAiGroup.position.z += (aidz / aidist) * AI_SPEED;
+        // Ball outside zone — walk back to home at normal speed
+        const aiHdx = AI_HOME.x - mAiGroup.position.x;
+        const aiHdz = AI_HOME.z - mAiGroup.position.z;
+        const aiHdist = Math.sqrt(aiHdx * aiHdx + aiHdz * aiHdz);
+        if (aiHdist > 0.1) {
+          mAiGroup.position.x += (aiHdx / aiHdist) * AI_SPEED;
+          mAiGroup.position.z += (aiHdz / aiHdist) * AI_SPEED;
+        }
+      }
+
+      // Teammate — chase ball in home zone, pass to player when close enough
+      const TM_ENGAGE = 18, TM_SPEED = 0.04, TM_PASS_RANGE = 45;
+      mTmPassTimer = Math.max(0, mTmPassTimer - 1);
+      const tmbdx = mBall.position.x - TM_HOME.x;
+      const tmbdz = mBall.position.z - TM_HOME.z;
+      const ballHomeDist = Math.sqrt(tmbdx * tmbdx + tmbdz * tmbdz);
+      if (ballHomeDist < TM_ENGAGE) {
+        const tbdx = mBall.position.x - mTmGroup.position.x;
+        const tbdz = mBall.position.z - mTmGroup.position.z;
+        const tbdist = Math.sqrt(tbdx * tbdx + tbdz * tbdz);
+        if (tbdist <= 1.5 && mTmPassTimer === 0) {
+          // Has the ball — check if player is in passing range
+          const tpdx = mPlayerGroup.position.x - mTmGroup.position.x;
+          const tpdz = mPlayerGroup.position.z - mTmGroup.position.z;
+          const tpdist = Math.sqrt(tpdx * tpdx + tpdz * tpdz);
+          if (tpdist < TM_PASS_RANGE) {
+            // Pass toward player — power scales with distance
+            const spd = Math.min(1.4, tpdist * 0.038);
+            mBallVel.x = (tpdx / tpdist) * spd;
+            mBallVel.z = (tpdz / tpdist) * spd;
+            mBallVel.y = Math.min(0.22, tpdist * 0.006);
+            mTmPassTimer = 90;
+          }
+          // else hold — player out of range, keep ball close
+        } else if (tbdist > 1.5) {
+          mTmGroup.position.x += (tbdx / tbdist) * TM_SPEED;
+          mTmGroup.position.z += (tbdz / tbdist) * TM_SPEED;
+        }
+      } else {
+        const thdx = TM_HOME.x - mTmGroup.position.x;
+        const thdz = TM_HOME.z - mTmGroup.position.z;
+        const thdist = Math.sqrt(thdx * thdx + thdz * thdz);
+        if (thdist > 0.1) {
+          mTmGroup.position.x += (thdx / thdist) * TM_SPEED;
+          mTmGroup.position.z += (thdz / thdist) * TM_SPEED;
+        }
       }
 
       updateMatchCamera();
