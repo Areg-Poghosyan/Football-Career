@@ -541,6 +541,29 @@
       opacity: 0; transition: opacity 0.4s;
     }
     #match-status.visible { opacity: 1; }
+    #postmatch-screen {
+      display: none; flex-direction: column; align-items: center; justify-content: center;
+      position: fixed; inset: 0; background: rgba(0,0,0,0.92);
+      z-index: 20; gap: 1.5rem;
+    }
+    #postmatch-screen.active { display: flex; }
+    #postmatch-title {
+      font-size: 3rem; font-weight: 900; color: #00ff88;
+      letter-spacing: 0.15em; text-transform: uppercase;
+      text-shadow: 0 0 24px rgba(0,255,136,0.4);
+    }
+    #postmatch-score-wrap {
+      display: flex; align-items: center; gap: 1.2rem;
+      font-size: 1.1rem; color: #ccc; font-weight: 600;
+    }
+    #postmatch-clubs { font-size: 1.1rem; color: #aaa; }
+    #postmatch-score-num {
+      font-size: 3.5rem; font-weight: 900; color: #fff;
+      background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.12);
+      padding: 0.3em 0.8em; border-radius: 8px;
+    }
+    #postmatch-btns { display: flex; gap: 1rem; margin-top: 1rem; }
+    #postmatch-headline { font-size: 1.3rem; color: #ccc; text-align: center; max-width: 480px; font-style: italic; }
     #match-goal-flash {
       position: absolute;
       inset: 0;
@@ -1314,6 +1337,43 @@
     <div id="power-bar-wrap"><div id="power-bar-fill"></div></div>
   </div>
 
+  <div id="postmatch-screen">
+    <div id="postmatch-title">Full Time</div>
+    <div id="postmatch-score-wrap">
+      <span id="postmatch-home"></span>
+      <span id="postmatch-score-num">0 – 0</span>
+      <span id="postmatch-away"></span>
+    </div>
+    <div id="postmatch-headline"></div>
+    <div id="postmatch-btns">
+      <button class="btn ready" onclick="mShowMatchNewspaper()">Continue</button>
+      <button class="btn" onclick="showScreen('menu')">Main Menu</button>
+    </div>
+  </div>
+
+  <!-- Match result newspaper overlay -->
+  <div id="match-newspaper" style="display:none;position:fixed;inset:0;background:#0a0a0a;z-index:25;align-items:center;justify-content:center;overflow-y:auto;">
+    <div class="newspaper-page">
+      <div class="newspaper-inner">
+        <h1 class="newspaper-title">The Football Chronicle</h1>
+        <hr class="newspaper-rule" />
+        <div class="newspaper-meta">
+          <span id="mn-date"></span>
+        </div>
+        <hr class="newspaper-rule-thin" />
+        <h2 class="newspaper-headline" id="mn-headline"></h2>
+        <p class="newspaper-deck" id="mn-deck"></p>
+        <hr class="newspaper-rule-article" />
+        <div class="newspaper-body">
+          <p id="mn-body"></p>
+        </div>
+        <div class="newspaper-continue-wrap">
+          <button class="newspaper-continue-btn" id="btn-mn-continue">Continue →</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Coming-soon popup overlay -->
   <div id="popup-overlay" onclick="closePopup()">
     <div id="popup" onclick="event.stopPropagation()">
@@ -1423,9 +1483,11 @@
     const trainingScreen    = document.getElementById('training-screen');
     const prematchScreen    = document.getElementById('prematch-screen');
     const matchScreen       = document.getElementById('match-screen');
+    const postmatchScreen   = document.getElementById('postmatch-screen');
 
     function showScreen(name) {
       menuWrapper.style.display = 'none';
+      postmatchScreen.classList.remove('active');
       [careerScreen, originScreen, newspaperScreen, managerScreen, trainingScreen, prematchScreen, matchScreen].forEach(s => s.classList.remove('active'));
 
       if      (name === 'career')    careerScreen.classList.add('active');
@@ -1435,6 +1497,7 @@
       else if (name === 'training')  trainingScreen.classList.add('active');
       else if (name === 'prematch')  prematchScreen.classList.add('active');
       else if (name === 'match')     matchScreen.classList.add('active');
+      else if (name === 'postmatch') postmatchScreen.classList.add('active');
       else                           menuWrapper.style.display = 'flex'; // 'menu'
     }
 
@@ -2175,6 +2238,52 @@
     const M_HALF_FRAMES = 45 * M_FRAMES_PER_MIN;
     const M_FULL_FRAMES = 90 * M_FRAMES_PER_MIN;
     let mTimerFrames = 0, mTimerPaused = false, mTimerDone = false;
+    const pmHomeEl     = document.getElementById('postmatch-home');
+    const pmAwayEl     = document.getElementById('postmatch-away');
+    const pmScoreEl    = document.getElementById('postmatch-score-num');
+    const pmHeadlineEl = document.getElementById('postmatch-headline');
+    const matchNewspaper = document.getElementById('match-newspaper');
+    document.getElementById('btn-mn-continue').addEventListener('click', () => {
+      matchNewspaper.style.display = 'none';
+      showScreen('season-screen');
+    });
+    function mShowMatchNewspaper() {
+      const club = (playerData && playerData.club) || 'Your Club';
+      const opp  = pmAwayEl.textContent || 'Opponents';
+      const score = mScoreHome + '–' + mScoreAway;
+      let headline, deck;
+      if (mScoreHome > mScoreAway) {
+        headline = `${club} Triumph in Stunning Victory`;
+        deck = `A ${score} scoreline sees ${club} claim all three points against ${opp}.`;
+      } else if (mScoreHome === mScoreAway) {
+        headline = `Honours Even as ${club} Draw`;
+        deck = `${club} and ${opp} cancel each other out in a hard-fought ${score} stalemate.`;
+      } else {
+        headline = `${club} Suffer Defeat`;
+        deck = `${opp} run out ${score} winners as ${club} fall to a disappointing loss.`;
+      }
+      document.getElementById('mn-date').textContent = new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+      document.getElementById('mn-headline').textContent = headline;
+      document.getElementById('mn-deck').textContent = deck;
+      document.getElementById('mn-body').textContent = `The final whistle blew at ${score} as ${club} faced ${opp} in what proved to be a memorable encounter. ${mScoreHome > mScoreAway ? `${club} dominated proceedings and fully deserved the three points.` : mScoreHome === mScoreAway ? `Neither side could find a winner despite both teams' best efforts.` : `${opp} proved too strong on the day, leaving ${club} with much to reflect on.`}`;
+      postmatchScreen.classList.remove('active');
+      matchNewspaper.style.display = 'flex';
+    }
+    function mShowFullTime() {
+      mTimerDone = true; mTimerFrames = M_FULL_FRAMES;
+      mTimerEl.textContent = "90'";
+      const home = mScoreHomeEl.textContent, away = mScoreAwayEl.textContent;
+      pmHomeEl.textContent  = home;
+      pmAwayEl.textContent  = away;
+      pmScoreEl.textContent = mScoreHome + ' – ' + mScoreAway;
+      if (mScoreHome > mScoreAway)
+        pmHeadlineEl.textContent = `${home} win ${mScoreHome}–${mScoreAway} in a dominant display!`;
+      else if (mScoreHome === mScoreAway)
+        pmHeadlineEl.textContent = `${home} and ${away} share the spoils — ${mScoreHome}–${mScoreAway}.`;
+      else
+        pmHeadlineEl.textContent = `${away} too strong — ${home} fall ${mScoreHome}–${mScoreAway}.`;
+      setTimeout(() => showScreen('postmatch'), 600);
+    }
     // Pick opponent club from same league
     const LEAGUES = {
       'Man City':     ['Liverpool','Arsenal','Chelsea','Man Utd','Tottenham'],
@@ -2970,10 +3079,7 @@
           }, 3000);
         }
         if (mTimerFrames >= M_FULL_FRAMES && !mTimerDone) {
-          mTimerDone = true;
-          mTimerEl.textContent = "90'";
-          mStatusEl.textContent = 'Full Time  ' + mScoreHome + ' – ' + mScoreAway;
-          mStatusEl.classList.add('visible');
+          mShowFullTime();
         }
       }
       if (mTimerDone) { updateMatchCamera(); mRenderer.render(mScene, mCamera); mLoopId = requestAnimationFrame(matchLoop); return; }
@@ -3513,7 +3619,12 @@
     // Pointer lock
     matchCanvas.addEventListener('click', () => matchCanvas.requestPointerLock());
     const mKeys = {};
-    window.addEventListener('keydown', e => { mKeys[e.code] = true;  });
+    window.addEventListener('keydown', e => {
+      mKeys[e.code] = true;
+      if (e.code === 'Backquote' && matchScreen.classList.contains('active') && !mTimerDone) {
+        mShowFullTime();
+      }
+    });
     window.addEventListener('keyup',   e => { mKeys[e.code] = false; });
     function mClearKeys() {
       ['KeyW','KeyA','KeyS','KeyD','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].forEach(k => { mKeys[k] = false; });
