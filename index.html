@@ -2378,6 +2378,127 @@
     let mAiRbPassTimer = 0;
     mScene.add(mAiRbGroup);
 
+    // Opponent CM — home at (0, -10), pass only toward positive z (never shoots)
+    const mAiCmGroup = new THREE.Group();
+    [-LEG_SPREAD, LEG_SPREAD].forEach(ox => {
+      const leg = new THREE.Mesh(new THREE.CylinderGeometry(LEG_R, LEG_R * 0.85, LEG_H, SEG), aiShortsMat);
+      leg.position.set(ox, LEG_H / 2, 0); mAiCmGroup.add(leg);
+      const boot = new THREE.Mesh(new THREE.CylinderGeometry(BOOT_R, BOOT_R, BOOT_H, SEG), aiBootMat);
+      boot.position.set(ox, BOOT_H / 2, 0); mAiCmGroup.add(boot);
+    });
+    const aiCmShorts = new THREE.Mesh(new THREE.CylinderGeometry(TORSO_R, TORSO_R * 0.9, SHORTS_H, SEG), aiShortsMat);
+    aiCmShorts.position.y = LEG_H + SHORTS_H / 2; mAiCmGroup.add(aiCmShorts);
+    const aiCmJersey = new THREE.Mesh(new THREE.CylinderGeometry(TORSO_R * 0.95, TORSO_R, TORSO_H, SEG), aiJerseyMat);
+    aiCmJersey.position.y = LEG_H + SHORTS_H + TORSO_H / 2; mAiCmGroup.add(aiCmJersey);
+    const aiCmShoulderY = LEG_H + SHORTS_H + TORSO_H * 0.75;
+    [-1, 1].forEach(side => {
+      const arm = new THREE.Mesh(new THREE.CylinderGeometry(ARM_R, ARM_R * 0.85, ARM_H, SEG), aiJerseyMat);
+      arm.position.set(side * (TORSO_R + ARM_R * 0.6), aiCmShoulderY - ARM_H / 2 + 0.045, 0);
+      mAiCmGroup.add(arm);
+    });
+    const aiCmHead = new THREE.Mesh(new THREE.SphereGeometry(HEAD_R, SEG, SEG), aiSkinMat);
+    aiCmHead.position.y = LEG_H + SHORTS_H + TORSO_H + HEAD_R + 0.05; mAiCmGroup.add(aiCmHead);
+    const AI_CM_HOME = { x: 0, z: -10 };
+    mAiCmGroup.position.set(AI_CM_HOME.x, 0, AI_CM_HOME.z);
+    let mAiCmPassTimer = 0;
+    mScene.add(mAiCmGroup);
+
+    // Opponent LM — home at (-15, -5), pass only toward positive z (never shoots)
+    const mAiLmGroup = new THREE.Group();
+    [-LEG_SPREAD, LEG_SPREAD].forEach(ox => {
+      const leg = new THREE.Mesh(new THREE.CylinderGeometry(LEG_R, LEG_R * 0.85, LEG_H, SEG), aiShortsMat);
+      leg.position.set(ox, LEG_H / 2, 0); mAiLmGroup.add(leg);
+      const boot = new THREE.Mesh(new THREE.CylinderGeometry(BOOT_R, BOOT_R, BOOT_H, SEG), aiBootMat);
+      boot.position.set(ox, BOOT_H / 2, 0); mAiLmGroup.add(boot);
+    });
+    const aiLmShorts = new THREE.Mesh(new THREE.CylinderGeometry(TORSO_R, TORSO_R * 0.9, SHORTS_H, SEG), aiShortsMat);
+    aiLmShorts.position.y = LEG_H + SHORTS_H / 2; mAiLmGroup.add(aiLmShorts);
+    const aiLmJersey = new THREE.Mesh(new THREE.CylinderGeometry(TORSO_R * 0.95, TORSO_R, TORSO_H, SEG), aiJerseyMat);
+    aiLmJersey.position.y = LEG_H + SHORTS_H + TORSO_H / 2; mAiLmGroup.add(aiLmJersey);
+    const aiLmShoulderY = LEG_H + SHORTS_H + TORSO_H * 0.75;
+    [-1, 1].forEach(side => {
+      const arm = new THREE.Mesh(new THREE.CylinderGeometry(ARM_R, ARM_R * 0.85, ARM_H, SEG), aiJerseyMat);
+      arm.position.set(side * (TORSO_R + ARM_R * 0.6), aiLmShoulderY - ARM_H / 2 + 0.045, 0);
+      mAiLmGroup.add(arm);
+    });
+    const aiLmHead = new THREE.Mesh(new THREE.SphereGeometry(HEAD_R, SEG, SEG), aiSkinMat);
+    aiLmHead.position.y = LEG_H + SHORTS_H + TORSO_H + HEAD_R + 0.05; mAiLmGroup.add(aiLmHead);
+    const AI_LM_HOME = { x: -15, z: -5 };
+    mAiLmGroup.position.set(AI_LM_HOME.x, 0, AI_LM_HOME.z);
+    let mAiLmPassTimer = 0;
+    mScene.add(mAiLmGroup);
+    const mAiRmGroup = new THREE.Group();
+    [-LEG_SPREAD, LEG_SPREAD].forEach(ox => {
+      const leg = new THREE.Mesh(new THREE.CylinderGeometry(LEG_R, LEG_R * 0.85, LEG_H, SEG), aiShortsMat);
+      leg.position.set(ox, LEG_H / 2, 0); mAiRmGroup.add(leg);
+      const boot = new THREE.Mesh(new THREE.CylinderGeometry(BOOT_R, BOOT_R, BOOT_H, SEG), aiBootMat);
+      boot.position.set(ox, BOOT_H / 2, 0); mAiRmGroup.add(boot);
+    });
+    const aiRmShorts = new THREE.Mesh(new THREE.CylinderGeometry(TORSO_R, TORSO_R * 0.9, SHORTS_H, SEG), aiShortsMat);
+    aiRmShorts.position.y = LEG_H + SHORTS_H / 2; mAiRmGroup.add(aiRmShorts);
+    const aiRmJersey = new THREE.Mesh(new THREE.CylinderGeometry(TORSO_R * 0.95, TORSO_R, TORSO_H, SEG), aiJerseyMat);
+    aiRmJersey.position.y = LEG_H + SHORTS_H + TORSO_H / 2; mAiRmGroup.add(aiRmJersey);
+    const aiRmShoulderY = LEG_H + SHORTS_H + TORSO_H * 0.75;
+    [-1, 1].forEach(side => {
+      const arm = new THREE.Mesh(new THREE.CylinderGeometry(ARM_R, ARM_R * 0.85, ARM_H, SEG), aiJerseyMat);
+      arm.position.set(side * (TORSO_R + ARM_R * 0.6), aiRmShoulderY - ARM_H / 2 + 0.045, 0);
+      mAiRmGroup.add(arm);
+    });
+    const aiRmHead = new THREE.Mesh(new THREE.SphereGeometry(HEAD_R, SEG, SEG), aiSkinMat);
+    aiRmHead.position.y = LEG_H + SHORTS_H + TORSO_H + HEAD_R + 0.05; mAiRmGroup.add(aiRmHead);
+    const AI_RM_HOME = { x: 15, z: -5 };
+    mAiRmGroup.position.set(AI_RM_HOME.x, 0, AI_RM_HOME.z);
+    let mAiRmPassTimer = 0;
+    mScene.add(mAiRmGroup);
+    // Opponent LW — home at (-20, +20), can shoot near player's goal
+    const mAiLwGroup = new THREE.Group();
+    [-LEG_SPREAD, LEG_SPREAD].forEach(ox => {
+      const leg = new THREE.Mesh(new THREE.CylinderGeometry(LEG_R, LEG_R * 0.85, LEG_H, SEG), aiShortsMat);
+      leg.position.set(ox, LEG_H / 2, 0); mAiLwGroup.add(leg);
+      const boot = new THREE.Mesh(new THREE.CylinderGeometry(BOOT_R, BOOT_R, BOOT_H, SEG), aiBootMat);
+      boot.position.set(ox, BOOT_H / 2, 0); mAiLwGroup.add(boot);
+    });
+    const aiLwShorts = new THREE.Mesh(new THREE.CylinderGeometry(TORSO_R, TORSO_R * 0.9, SHORTS_H, SEG), aiShortsMat);
+    aiLwShorts.position.y = LEG_H + SHORTS_H / 2; mAiLwGroup.add(aiLwShorts);
+    const aiLwJersey = new THREE.Mesh(new THREE.CylinderGeometry(TORSO_R * 0.95, TORSO_R, TORSO_H, SEG), aiJerseyMat);
+    aiLwJersey.position.y = LEG_H + SHORTS_H + TORSO_H / 2; mAiLwGroup.add(aiLwJersey);
+    const aiLwShoulderY = LEG_H + SHORTS_H + TORSO_H * 0.75;
+    [-1, 1].forEach(side => {
+      const arm = new THREE.Mesh(new THREE.CylinderGeometry(ARM_R, ARM_R * 0.85, ARM_H, SEG), aiJerseyMat);
+      arm.position.set(side * (TORSO_R + ARM_R * 0.6), aiLwShoulderY - ARM_H / 2 + 0.045, 0);
+      mAiLwGroup.add(arm);
+    });
+    const aiLwHead = new THREE.Mesh(new THREE.SphereGeometry(HEAD_R, SEG, SEG), aiSkinMat);
+    aiLwHead.position.y = LEG_H + SHORTS_H + TORSO_H + HEAD_R + 0.05; mAiLwGroup.add(aiLwHead);
+    const AI_LW_HOME = { x: -20, z: 20 };
+    mAiLwGroup.position.set(AI_LW_HOME.x, 0, AI_LW_HOME.z);
+    let mAiLwPassTimer = 0;
+    mScene.add(mAiLwGroup);
+    // Opponent RW — home at (+20, +20), can shoot near player's goal
+    const mAiRwGroup = new THREE.Group();
+    [-LEG_SPREAD, LEG_SPREAD].forEach(ox => {
+      const leg = new THREE.Mesh(new THREE.CylinderGeometry(LEG_R, LEG_R * 0.85, LEG_H, SEG), aiShortsMat);
+      leg.position.set(ox, LEG_H / 2, 0); mAiRwGroup.add(leg);
+      const boot = new THREE.Mesh(new THREE.CylinderGeometry(BOOT_R, BOOT_R, BOOT_H, SEG), aiBootMat);
+      boot.position.set(ox, BOOT_H / 2, 0); mAiRwGroup.add(boot);
+    });
+    const aiRwShorts = new THREE.Mesh(new THREE.CylinderGeometry(TORSO_R, TORSO_R * 0.9, SHORTS_H, SEG), aiShortsMat);
+    aiRwShorts.position.y = LEG_H + SHORTS_H / 2; mAiRwGroup.add(aiRwShorts);
+    const aiRwJersey = new THREE.Mesh(new THREE.CylinderGeometry(TORSO_R * 0.95, TORSO_R, TORSO_H, SEG), aiJerseyMat);
+    aiRwJersey.position.y = LEG_H + SHORTS_H + TORSO_H / 2; mAiRwGroup.add(aiRwJersey);
+    const aiRwShoulderY = LEG_H + SHORTS_H + TORSO_H * 0.75;
+    [-1, 1].forEach(side => {
+      const arm = new THREE.Mesh(new THREE.CylinderGeometry(ARM_R, ARM_R * 0.85, ARM_H, SEG), aiJerseyMat);
+      arm.position.set(side * (TORSO_R + ARM_R * 0.6), aiRwShoulderY - ARM_H / 2 + 0.045, 0);
+      mAiRwGroup.add(arm);
+    });
+    const aiRwHead = new THREE.Mesh(new THREE.SphereGeometry(HEAD_R, SEG, SEG), aiSkinMat);
+    aiRwHead.position.y = LEG_H + SHORTS_H + TORSO_H + HEAD_R + 0.05; mAiRwGroup.add(aiRwHead);
+    const AI_RW_HOME = { x: 20, z: 20 };
+    mAiRwGroup.position.set(AI_RW_HOME.x, 0, AI_RW_HOME.z);
+    let mAiRwPassTimer = 0;
+    mScene.add(mAiRwGroup);
+
     // Teammate — same humanoid, distinct yellow-green kit, static for now
     const mTmGroup = new THREE.Group();
     const tmJerseyMat = new THREE.MeshLambertMaterial({ color: mJerseyColor });
@@ -2631,6 +2752,11 @@
       aiCb:   { x: AI_CB_HOME.x, z: AI_CB_HOME.z },
       aiLb:   { x: AI_LB_HOME.x, z: AI_LB_HOME.z },
       aiRb:   { x: AI_RB_HOME.x, z: AI_RB_HOME.z },
+      aiCm:   { x: AI_CM_HOME.x, z: AI_CM_HOME.z },
+      aiLm:   { x: AI_LM_HOME.x, z: AI_LM_HOME.z },
+      aiRm:   { x: AI_RM_HOME.x, z: AI_RM_HOME.z },
+      aiLw:   { x: AI_LW_HOME.x, z: AI_LW_HOME.z },
+      aiRw:   { x: AI_RW_HOME.x, z: AI_RW_HOME.z },
     };
 
     const M_SPEED = 0.12;
@@ -2806,6 +2932,11 @@
         aiCb:   { x: mAiCbGroup.position.x - mPrev.aiCb.x, z: mAiCbGroup.position.z - mPrev.aiCb.z },
         aiLb:   { x: mAiLbGroup.position.x - mPrev.aiLb.x, z: mAiLbGroup.position.z - mPrev.aiLb.z },
         aiRb:   { x: mAiRbGroup.position.x - mPrev.aiRb.x, z: mAiRbGroup.position.z - mPrev.aiRb.z },
+        aiCm:   { x: mAiCmGroup.position.x - mPrev.aiCm.x, z: mAiCmGroup.position.z - mPrev.aiCm.z },
+        aiLm:   { x: mAiLmGroup.position.x - mPrev.aiLm.x, z: mAiLmGroup.position.z - mPrev.aiLm.z },
+        aiRm:   { x: mAiRmGroup.position.x - mPrev.aiRm.x, z: mAiRmGroup.position.z - mPrev.aiRm.z },
+        aiLw:   { x: mAiLwGroup.position.x - mPrev.aiLw.x, z: mAiLwGroup.position.z - mPrev.aiLw.z },
+        aiRw:   { x: mAiRwGroup.position.x - mPrev.aiRw.x, z: mAiRwGroup.position.z - mPrev.aiRw.z },
       };
       mPrev.player.x = mPlayerGroup.position.x; mPrev.player.z = mPlayerGroup.position.z;
       mPrev.tm.x     = mTmGroup.position.x;     mPrev.tm.z     = mTmGroup.position.z;
@@ -2821,6 +2952,11 @@
       mPrev.aiCb.x   = mAiCbGroup.position.x;   mPrev.aiCb.z   = mAiCbGroup.position.z;
       mPrev.aiLb.x   = mAiLbGroup.position.x;   mPrev.aiLb.z   = mAiLbGroup.position.z;
       mPrev.aiRb.x   = mAiRbGroup.position.x;   mPrev.aiRb.z   = mAiRbGroup.position.z;
+      mPrev.aiCm.x   = mAiCmGroup.position.x;   mPrev.aiCm.z   = mAiCmGroup.position.z;
+      mPrev.aiLm.x   = mAiLmGroup.position.x;   mPrev.aiLm.z   = mAiLmGroup.position.z;
+      mPrev.aiRm.x   = mAiRmGroup.position.x;   mPrev.aiRm.z   = mAiRmGroup.position.z;
+      mPrev.aiLw.x   = mAiLwGroup.position.x;   mPrev.aiLw.z   = mAiLwGroup.position.z;
+      mPrev.aiRw.x   = mAiRwGroup.position.x;   mPrev.aiRw.z   = mAiRwGroup.position.z;
 
       // Shared teammate helper — pass toward predicted position of closest forward target.
       // attackDirZ: -1 = player's team (attack toward z=-52.5), +1 = opponent (attack toward z=+52.5).
@@ -2959,6 +3095,11 @@
           { group: mAiCbGroup, vel: mVel.aiCb },
           { group: mAiLbGroup, vel: mVel.aiLb },
           { group: mAiRbGroup, vel: mVel.aiRb },
+          { group: mAiCmGroup, vel: mVel.aiCm },
+          { group: mAiLmGroup, vel: mVel.aiLm },
+          { group: mAiRmGroup, vel: mVel.aiRm },
+          { group: mAiLwGroup, vel: mVel.aiLw },
+          { group: mAiRwGroup, vel: mVel.aiRw },
         ].filter(c => c.group !== fromGroup && c.group.position.z > fromGroup.position.z);
         let best = null, bestDist = Infinity;
         pool.forEach(c => {
@@ -3017,6 +3158,80 @@
       const aiCbBallDist = tmMove(mAiCbGroup, AI_CB_HOME, 12, TM_SPEED);
       if (aiCbBallDist <= 1.5 && mAiCbPassTimer === 0) {
         if (!aiPass(mAiCbGroup, v => mAiCbPassTimer = v)) mAiCbPassTimer = 30;
+      }
+      // Opponent CM — zone, pass toward +z only (never shoots)
+      mAiCmPassTimer = Math.max(0, mAiCmPassTimer - 1);
+      const aiCmBallDist = tmMove(mAiCmGroup, AI_CM_HOME, 15, TM_SPEED);
+      if (aiCmBallDist <= 1.5 && mAiCmPassTimer === 0) {
+        if (!aiPass(mAiCmGroup, v => mAiCmPassTimer = v)) mAiCmPassTimer = 30;
+      }
+      // Opponent LM — zone, pass toward +z only (never shoots)
+      mAiLmPassTimer = Math.max(0, mAiLmPassTimer - 1);
+      const aiLmBallDist = tmMove(mAiLmGroup, AI_LM_HOME, TM_ENGAGE, TM_SPEED);
+      if (aiLmBallDist <= 1.5 && mAiLmPassTimer === 0) {
+        if (!aiPass(mAiLmGroup, v => mAiLmPassTimer = v)) mAiLmPassTimer = 30;
+      }
+      // Opponent RM — zone, pass toward +z only (never shoots)
+      mAiRmPassTimer = Math.max(0, mAiRmPassTimer - 1);
+      const aiRmBallDist = tmMove(mAiRmGroup, AI_RM_HOME, TM_ENGAGE, TM_SPEED);
+      if (aiRmBallDist <= 1.5 && mAiRmPassTimer === 0) {
+        if (!aiPass(mAiRmGroup, v => mAiRmPassTimer = v)) mAiRmPassTimer = 30;
+      }
+      // Opponent LW — zone, aiPass toward +z; shoots within 25m of z=+52.5
+      mAiLwPassTimer = Math.max(0, mAiLwPassTimer - 1);
+      const aiLwBallDist = tmMove(mAiLwGroup, AI_LW_HOME, TM_ENGAGE, TM_SPEED);
+      if (aiLwBallDist <= 1.5 && mAiLwPassTimer === 0) {
+        const aiLwNearGoal = mAiLwGroup.position.z > 27.5;
+        if (aiLwNearGoal) {
+          // Shoot toward z=+52.5
+          const aiLwShootDx = -mAiLwGroup.position.x * 0.15;
+          const aiLwShootDz = 52.5 - mAiLwGroup.position.z;
+          const aiLwShootDist = Math.sqrt(aiLwShootDx * aiLwShootDx + aiLwShootDz * aiLwShootDz);
+          mBallVel.x = (aiLwShootDx / aiLwShootDist) * 0.55;
+          mBallVel.z = (aiLwShootDz / aiLwShootDist) * 0.55;
+          mBallVel.y = 0.08;
+          mAiLwPassTimer = 60;
+        } else {
+          const aiLwAtEdge = mAiLwGroup.position.z >= AI_LW_HOME.z + TM_ENGAGE;
+          if (aiLwAtEdge) {
+            if (!aiPass(mAiLwGroup, v => mAiLwPassTimer = v)) mAiLwPassTimer = 30;
+          } else {
+            if (!aiPass(mAiLwGroup, v => mAiLwPassTimer = v)) {
+              mBallVel.z = 0.18;
+              mBallVel.x += (-mBall.position.x * 0.02);
+              mBallVel.y = 0.02;
+              mAiLwPassTimer = 25;
+            }
+          }
+        }
+      }
+      // Opponent RW — zone, aiPass toward +z; shoots within 25m of z=+52.5
+      mAiRwPassTimer = Math.max(0, mAiRwPassTimer - 1);
+      const aiRwBallDist = tmMove(mAiRwGroup, AI_RW_HOME, TM_ENGAGE, TM_SPEED);
+      if (aiRwBallDist <= 1.5 && mAiRwPassTimer === 0) {
+        const aiRwNearGoal = mAiRwGroup.position.z > 27.5;
+        if (aiRwNearGoal) {
+          // Shoot toward z=+52.5
+          const aiRwShootDx = -mAiRwGroup.position.x * 0.15;
+          const aiRwShootDz = 52.5 - mAiRwGroup.position.z;
+          const aiRwShootDist = Math.sqrt(aiRwShootDx * aiRwShootDx + aiRwShootDz * aiRwShootDz);
+          mBallVel.x = (aiRwShootDx / aiRwShootDist) * 0.55;
+          mBallVel.z = (aiRwShootDz / aiRwShootDist) * 0.55;
+          mBallVel.y = 0.08;
+          mAiRwPassTimer = 60;
+        } else {
+          const aiRwAtEdge = mAiRwGroup.position.z >= AI_RW_HOME.z + TM_ENGAGE;
+          if (aiRwAtEdge) {
+            if (!aiPass(mAiRwGroup, v => mAiRwPassTimer = v)) mAiRwPassTimer = 30;
+          } else {
+            if (!aiPass(mAiRwGroup, v => mAiRwPassTimer = v)) {
+              mBallVel.z = 0.18;
+              mBallVel.x += (-mBall.position.x * 0.02);
+              mBallVel.y = 0.02;
+              mAiRwPassTimer = 25;
+            }
+          }
+        }
       }
       // Opponent LB — tight zone, pass toward +z only
       mAiLbPassTimer = Math.max(0, mAiLbPassTimer - 1);
