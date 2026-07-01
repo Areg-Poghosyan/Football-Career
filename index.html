@@ -2273,7 +2273,7 @@
     const aiHead = new THREE.Mesh(new THREE.SphereGeometry(ai_HEAD_R, SEG, SEG), aiSkinMat);
     aiHead.position.y = ai_LEG_H + ai_SHORTS_H + ai_TORSO_H + ai_HEAD_R + 0.05;
     mAiGroup.add(aiHead);
-    const AI_HOME = { x: 0, z: -20 };
+    const AI_HOME = { x: 0, z: 15 };
     mAiGroup.position.set(AI_HOME.x, 0, AI_HOME.z);
     let mAiTouchTimer = 0;
     mScene.add(mAiGroup);
@@ -2861,11 +2861,34 @@
         mBallVel.z = nz * M_SPEED * mTouchMult;
       }
 
+      // Dynamic team shape — whole formation shifts along z with the ball
+      const _sh = Math.max(-10, Math.min(10, mBall.position.z * 0.2));
+      function _tm(home, lo, hi) { return { x: home.x, z: Math.max(lo, Math.min(hi, home.z + _sh)) }; }
+      function _ai(home, lo, hi) { return { x: home.x, z: Math.max(lo, Math.min(hi, home.z + _sh)) }; }
+      const TM_HOME_E  = _tm(TM_HOME,  -20, 25);
+      const TM2_HOME_E = _tm(TM2_HOME, -20, 25);
+      const TM3_HOME_E = _tm(TM3_HOME,  10, 48);
+      const TM4_HOME_E = _tm(TM4_HOME,  10, 48);
+      const TM5_HOME_E = _tm(TM5_HOME,  38, 51);
+      const TM6_HOME_E = _tm(TM6_HOME,  10, 48);
+      const TM7_HOME_E = _tm(TM7_HOME, -10, 35);
+      const TM8_HOME_E = _tm(TM8_HOME, -20, 25);
+      const AI_HOME_E    = _ai(AI_HOME,    -5, 40);
+      const AI_GK_HOME_E = _ai(AI_GK_HOME,-51,-38);
+      const AI_CB_HOME_E = _ai(AI_CB_HOME,-48,-10);
+      const AI_LB_HOME_E = _ai(AI_LB_HOME,-48,-10);
+      const AI_RB_HOME_E = _ai(AI_RB_HOME,-48,-10);
+      const AI_CM_HOME_E = _ai(AI_CM_HOME,-35, 10);
+      const AI_LM_HOME_E = _ai(AI_LM_HOME,-25, 20);
+      const AI_RM_HOME_E = _ai(AI_RM_HOME,-25, 20);
+      const AI_LW_HOME_E = _ai(AI_LW_HOME,-10, 40);
+      const AI_RW_HOME_E = _ai(AI_RW_HOME,-10, 40);
+
       // AI — chase ball, kick toward player goal when close
       // AI dribble logic — only engage when ball is within home zone
       const AI_SPEED = 0.055, AI_DRIBBLE_DIST = 1.4, AI_SHOOT_Z = 32, AI_ENGAGE = 20;
-      const aiBallHomeDx = mBall.position.x - AI_HOME.x;
-      const aiBallHomeDz = mBall.position.z - AI_HOME.z;
+      const aiBallHomeDx = mBall.position.x - AI_HOME_E.x;
+      const aiBallHomeDz = mBall.position.z - AI_HOME_E.z;
       const aiBallHomeDist = Math.sqrt(aiBallHomeDx * aiBallHomeDx + aiBallHomeDz * aiBallHomeDz);
       const aidx = mBall.position.x - mAiGroup.position.x;
       const aidz = mBall.position.z - mAiGroup.position.z;
@@ -2883,8 +2906,8 @@
             // Pass to a forward opponent teammate (attacks toward +z); dribble forward if none
             const aiPassCandidates = []; // no other opponent capsules defined yet
             const hasFwdOpponent = aiPassCandidates.some(g => g.position.z > mAiGroup.position.z);
-            // Front edge of AI zone toward +z: AI_HOME.z + AI_ENGAGE = -20 + 20 = 0
-            const aiAtFrontEdge = mAiGroup.position.z >= AI_HOME.z + AI_ENGAGE;
+            // Front edge of AI zone toward +z: AI_HOME.z + AI_ENGAGE
+            const aiAtFrontEdge = mAiGroup.position.z >= AI_HOME_E.z + AI_ENGAGE;
             const aiNearGoal    = mAiGroup.position.z > 27.5; // within 25m of z=+52.5
             if (hasFwdOpponent) {
               // pass (future: call tmPass when mVel available in this block)
@@ -2908,8 +2931,8 @@
         }
       } else {
         // Ball outside zone — walk back to home at normal speed
-        const aiHdx = AI_HOME.x - mAiGroup.position.x;
-        const aiHdz = AI_HOME.z - mAiGroup.position.z;
+        const aiHdx = AI_HOME_E.x - mAiGroup.position.x;
+        const aiHdz = AI_HOME_E.z - mAiGroup.position.z;
         const aiHdist = Math.sqrt(aiHdx * aiHdx + aiHdz * aiHdz);
         if (aiHdist > 0.1) {
           mAiGroup.position.x += (aiHdx / aiHdist) * AI_SPEED;
@@ -2974,8 +2997,22 @@
           { group: mTm8Group,    vel: mVel.tm8    },
         ].filter(c => c.group !== fromGroup)
          .filter(c => attackDirZ * c.group.position.z > attackDirZ * fromGroup.position.z);
+        const fallback = candidates.length === 0
+          ? [
+              { group: mPlayerGroup, vel: mVel.player },
+              { group: mTmGroup,     vel: mVel.tm     },
+              { group: mTm2Group,    vel: mVel.tm2    },
+              { group: mTm3Group,    vel: mVel.tm3    },
+              { group: mTm4Group,    vel: mVel.tm4    },
+              { group: mTm5Group,    vel: mVel.tm5    },
+              { group: mTm6Group,    vel: mVel.tm6    },
+              { group: mTm7Group,    vel: mVel.tm7    },
+              { group: mTm8Group,    vel: mVel.tm8    },
+            ].filter(c => c.group !== fromGroup)
+             .filter(c => Math.abs(c.group.position.z - fromGroup.position.z) <= 15)
+          : candidates;
         let best = null, bestDist = Infinity;
-        candidates.forEach(c => {
+        fallback.forEach(c => {
           const dx = c.group.position.x - fromGroup.position.x;
           const dz = c.group.position.z - fromGroup.position.z;
           const d = Math.sqrt(dx * dx + dz * dz);
@@ -3034,56 +3071,56 @@
       }
       // Teammate 1 — attacks toward z=-52.5
       mTmPassTimer = Math.max(0, mTmPassTimer - 1);
-      const tm1BallDist = tmMove(mTmGroup, TM_HOME, 13, TM_SPEED);
+      const tm1BallDist = tmMove(mTmGroup, TM_HOME_E, 13, TM_SPEED);
       if (tm1BallDist <= 1.5 && mTmPassTimer === 0) {
         if (!tmPass(mTmGroup, mTmPassTimer, v => mTmPassTimer = v, -1))
-          tmDribbleFwd(mTmGroup, TM_HOME, 13, -1, v => mTmPassTimer = v);
+          tmDribbleFwd(mTmGroup, TM_HOME_E, 13, -1, v => mTmPassTimer = v);
       }
       // Teammate 2 — attacks toward z=-52.5
       mTm2PassTimer = Math.max(0, mTm2PassTimer - 1);
-      const tm2BallDist = tmMove(mTm2Group, TM2_HOME, TM_ENGAGE, TM_SPEED);
+      const tm2BallDist = tmMove(mTm2Group, TM2_HOME_E, TM_ENGAGE, TM_SPEED);
       if (tm2BallDist <= 1.5 && mTm2PassTimer === 0) {
         if (!tmPass(mTm2Group, mTm2PassTimer, v => mTm2PassTimer = v, -1))
-          tmDribbleFwd(mTm2Group, TM2_HOME, TM_ENGAGE, -1, v => mTm2PassTimer = v);
+          tmDribbleFwd(mTm2Group, TM2_HOME_E, TM_ENGAGE, -1, v => mTm2PassTimer = v);
       }
       // CB — tight zone, attacks toward z=-52.5
       mTm3PassTimer = Math.max(0, mTm3PassTimer - 1);
-      const tm3BallDist = tmMove(mTm3Group, TM3_HOME, 12, TM_SPEED);
+      const tm3BallDist = tmMove(mTm3Group, TM3_HOME_E, 12, TM_SPEED);
       if (tm3BallDist <= 1.5 && mTm3PassTimer === 0) {
         if (!tmPass(mTm3Group, mTm3PassTimer, v => mTm3PassTimer = v, -1))
-          tmDribbleFwd(mTm3Group, TM3_HOME, 12, -1, v => mTm3PassTimer = v);
+          tmDribbleFwd(mTm3Group, TM3_HOME_E, 12, -1, v => mTm3PassTimer = v);
       }
       // LB — tight zone, attacks toward z=-52.5
       mTm4PassTimer = Math.max(0, mTm4PassTimer - 1);
-      const tm4BallDist = tmMove(mTm4Group, TM4_HOME, 12, TM_SPEED);
+      const tm4BallDist = tmMove(mTm4Group, TM4_HOME_E, 12, TM_SPEED);
       if (tm4BallDist <= 1.5 && mTm4PassTimer === 0) {
         if (!tmPass(mTm4Group, mTm4PassTimer, v => mTm4PassTimer = v, -1))
-          tmDribbleFwd(mTm4Group, TM4_HOME, 12, -1, v => mTm4PassTimer = v);
+          tmDribbleFwd(mTm4Group, TM4_HOME_E, 12, -1, v => mTm4PassTimer = v);
       }
       // GK — very tight zone, pass only toward negative z (never shoots, never leaves zone)
       mTm5PassTimer = Math.max(0, mTm5PassTimer - 1);
-      const tm5BallDist = tmMove(mTm5Group, TM5_HOME, 8, TM_SPEED);
+      const tm5BallDist = tmMove(mTm5Group, TM5_HOME_E, 8, TM_SPEED);
       if (tm5BallDist <= 1.5 && mTm5PassTimer === 0) {
         if (!tmPass(mTm5Group, mTm5PassTimer, v => mTm5PassTimer = v, -1)) mTm5PassTimer = 30;
       }
       // RB — tight zone, pass only toward negative z (never shoots)
       mTm6PassTimer = Math.max(0, mTm6PassTimer - 1);
-      const tm6BallDist = tmMove(mTm6Group, TM6_HOME, 12, TM_SPEED);
+      const tm6BallDist = tmMove(mTm6Group, TM6_HOME_E, 12, TM_SPEED);
       if (tm6BallDist <= 1.5 && mTm6PassTimer === 0) {
         if (!tmPass(mTm6Group, mTm6PassTimer, v => mTm6PassTimer = v, -1)) mTm6PassTimer = 30;
       }
       // CM — zone, pass only toward negative z (never shoots)
       mTm7PassTimer = Math.max(0, mTm7PassTimer - 1);
-      const tm7BallDist = tmMove(mTm7Group, TM7_HOME, 15, TM_SPEED);
+      const tm7BallDist = tmMove(mTm7Group, TM7_HOME_E, 15, TM_SPEED);
       if (tm7BallDist <= 1.5 && mTm7PassTimer === 0) {
         if (!tmPass(mTm7Group, mTm7PassTimer, v => mTm7PassTimer = v, -1)) mTm7PassTimer = 30;
       }
       // RW — zone, passes toward negative z; dribbles forward (can shoot within 25m of z=-52.5)
       mTm8PassTimer = Math.max(0, mTm8PassTimer - 1);
-      const tm8BallDist = tmMove(mTm8Group, TM8_HOME, TM_ENGAGE, TM_SPEED);
+      const tm8BallDist = tmMove(mTm8Group, TM8_HOME_E, TM_ENGAGE, TM_SPEED);
       if (tm8BallDist <= 1.5 && mTm8PassTimer === 0) {
         if (!tmPass(mTm8Group, mTm8PassTimer, v => mTm8PassTimer = v, -1))
-          tmDribbleFwd(mTm8Group, TM8_HOME, TM_ENGAGE, -1, v => mTm8PassTimer = v);
+          tmDribbleFwd(mTm8Group, TM8_HOME_E, TM_ENGAGE, -1, v => mTm8PassTimer = v);
       }
 
       // Opponent back-line — pass only toward positive z (+52.5), never shoot
@@ -3128,8 +3165,8 @@
         return false;
       }
       // Opponent GK — same zone logic as mAiGroup, never shoots, passes toward +z only
-      const aiGkBhDx = mBall.position.x - AI_GK_HOME.x;
-      const aiGkBhDz = mBall.position.z - AI_GK_HOME.z;
+      const aiGkBhDx = mBall.position.x - AI_GK_HOME_E.x;
+      const aiGkBhDz = mBall.position.z - AI_GK_HOME_E.z;
       const aiGkBhDist = Math.sqrt(aiGkBhDx * aiGkBhDx + aiGkBhDz * aiGkBhDz);
       const aiGkTbDx = mBall.position.x - mAiGkGroup.position.x;
       const aiGkTbDz = mBall.position.z - mAiGkGroup.position.z;
@@ -3145,8 +3182,8 @@
           mAiGkGroup.position.z += (aiGkTbDz / aiGkTbDist) * AI_SPEED;
         }
       } else {
-        const aiGkHdx = AI_GK_HOME.x - mAiGkGroup.position.x;
-        const aiGkHdz = AI_GK_HOME.z - mAiGkGroup.position.z;
+        const aiGkHdx = AI_GK_HOME_E.x - mAiGkGroup.position.x;
+        const aiGkHdz = AI_GK_HOME_E.z - mAiGkGroup.position.z;
         const aiGkHdist = Math.sqrt(aiGkHdx * aiGkHdx + aiGkHdz * aiGkHdz);
         if (aiGkHdist > 0.1) {
           mAiGkGroup.position.x += (aiGkHdx / aiGkHdist) * AI_SPEED;
@@ -3155,31 +3192,31 @@
       }
       // Opponent CB — tight zone, pass toward +z only
       mAiCbPassTimer = Math.max(0, mAiCbPassTimer - 1);
-      const aiCbBallDist = tmMove(mAiCbGroup, AI_CB_HOME, 12, TM_SPEED);
+      const aiCbBallDist = tmMove(mAiCbGroup, AI_CB_HOME_E, 12, TM_SPEED);
       if (aiCbBallDist <= 1.5 && mAiCbPassTimer === 0) {
         if (!aiPass(mAiCbGroup, v => mAiCbPassTimer = v)) mAiCbPassTimer = 30;
       }
       // Opponent CM — zone, pass toward +z only (never shoots)
       mAiCmPassTimer = Math.max(0, mAiCmPassTimer - 1);
-      const aiCmBallDist = tmMove(mAiCmGroup, AI_CM_HOME, 15, TM_SPEED);
+      const aiCmBallDist = tmMove(mAiCmGroup, AI_CM_HOME_E, 15, TM_SPEED);
       if (aiCmBallDist <= 1.5 && mAiCmPassTimer === 0) {
         if (!aiPass(mAiCmGroup, v => mAiCmPassTimer = v)) mAiCmPassTimer = 30;
       }
       // Opponent LM — zone, pass toward +z only (never shoots)
       mAiLmPassTimer = Math.max(0, mAiLmPassTimer - 1);
-      const aiLmBallDist = tmMove(mAiLmGroup, AI_LM_HOME, TM_ENGAGE, TM_SPEED);
+      const aiLmBallDist = tmMove(mAiLmGroup, AI_LM_HOME_E, TM_ENGAGE, TM_SPEED);
       if (aiLmBallDist <= 1.5 && mAiLmPassTimer === 0) {
         if (!aiPass(mAiLmGroup, v => mAiLmPassTimer = v)) mAiLmPassTimer = 30;
       }
       // Opponent RM — zone, pass toward +z only (never shoots)
       mAiRmPassTimer = Math.max(0, mAiRmPassTimer - 1);
-      const aiRmBallDist = tmMove(mAiRmGroup, AI_RM_HOME, TM_ENGAGE, TM_SPEED);
+      const aiRmBallDist = tmMove(mAiRmGroup, AI_RM_HOME_E, TM_ENGAGE, TM_SPEED);
       if (aiRmBallDist <= 1.5 && mAiRmPassTimer === 0) {
         if (!aiPass(mAiRmGroup, v => mAiRmPassTimer = v)) mAiRmPassTimer = 30;
       }
       // Opponent LW — zone, aiPass toward +z; shoots within 25m of z=+52.5
       mAiLwPassTimer = Math.max(0, mAiLwPassTimer - 1);
-      const aiLwBallDist = tmMove(mAiLwGroup, AI_LW_HOME, TM_ENGAGE, TM_SPEED);
+      const aiLwBallDist = tmMove(mAiLwGroup, AI_LW_HOME_E, TM_ENGAGE, TM_SPEED);
       if (aiLwBallDist <= 1.5 && mAiLwPassTimer === 0) {
         const aiLwNearGoal = mAiLwGroup.position.z > 27.5;
         if (aiLwNearGoal) {
@@ -3192,7 +3229,7 @@
           mBallVel.y = 0.08;
           mAiLwPassTimer = 60;
         } else {
-          const aiLwAtEdge = mAiLwGroup.position.z >= AI_LW_HOME.z + TM_ENGAGE;
+          const aiLwAtEdge = mAiLwGroup.position.z >= AI_LW_HOME_E.z + TM_ENGAGE;
           if (aiLwAtEdge) {
             if (!aiPass(mAiLwGroup, v => mAiLwPassTimer = v)) mAiLwPassTimer = 30;
           } else {
@@ -3207,7 +3244,7 @@
       }
       // Opponent RW — zone, aiPass toward +z; shoots within 25m of z=+52.5
       mAiRwPassTimer = Math.max(0, mAiRwPassTimer - 1);
-      const aiRwBallDist = tmMove(mAiRwGroup, AI_RW_HOME, TM_ENGAGE, TM_SPEED);
+      const aiRwBallDist = tmMove(mAiRwGroup, AI_RW_HOME_E, TM_ENGAGE, TM_SPEED);
       if (aiRwBallDist <= 1.5 && mAiRwPassTimer === 0) {
         const aiRwNearGoal = mAiRwGroup.position.z > 27.5;
         if (aiRwNearGoal) {
@@ -3220,7 +3257,7 @@
           mBallVel.y = 0.08;
           mAiRwPassTimer = 60;
         } else {
-          const aiRwAtEdge = mAiRwGroup.position.z >= AI_RW_HOME.z + TM_ENGAGE;
+          const aiRwAtEdge = mAiRwGroup.position.z >= AI_RW_HOME_E.z + TM_ENGAGE;
           if (aiRwAtEdge) {
             if (!aiPass(mAiRwGroup, v => mAiRwPassTimer = v)) mAiRwPassTimer = 30;
           } else {
@@ -3235,13 +3272,13 @@
       }
       // Opponent LB — tight zone, pass toward +z only
       mAiLbPassTimer = Math.max(0, mAiLbPassTimer - 1);
-      const aiLbBallDist = tmMove(mAiLbGroup, AI_LB_HOME, 12, TM_SPEED);
+      const aiLbBallDist = tmMove(mAiLbGroup, AI_LB_HOME_E, 12, TM_SPEED);
       if (aiLbBallDist <= 1.5 && mAiLbPassTimer === 0) {
         if (!aiPass(mAiLbGroup, v => mAiLbPassTimer = v)) mAiLbPassTimer = 30;
       }
       // Opponent RB — tight zone, pass toward +z only (mirrors mTm6 logic with attackDirZ=+1)
       mAiRbPassTimer = Math.max(0, mAiRbPassTimer - 1);
-      const aiRbBallDist = tmMove(mAiRbGroup, AI_RB_HOME, 12, TM_SPEED);
+      const aiRbBallDist = tmMove(mAiRbGroup, AI_RB_HOME_E, 12, TM_SPEED);
       if (aiRbBallDist <= 1.5 && mAiRbPassTimer === 0) {
         if (!aiPass(mAiRbGroup, v => mAiRbPassTimer = v)) mAiRbPassTimer = 30;
       }
