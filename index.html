@@ -2399,6 +2399,122 @@
     let mTm4PassTimer = 0;
     mScene.add(mTm4Group);
 
+    // GK teammate — goalkeeper, home at (0, +48), pass only toward negative z (never shoots)
+    const mTm5Group = new THREE.Group();
+    const tm5JerseyMat = new THREE.MeshLambertMaterial({ color: mJerseyColor });
+    const tm5ShortsMat = new THREE.MeshLambertMaterial({ color: mShortsColor });
+    const tm5SkinMat   = new THREE.MeshLambertMaterial({ color: 0xd4a57a });
+    const tm5BootMat   = new THREE.MeshLambertMaterial({ color: 0x222222 });
+    [-LEG_SPREAD, LEG_SPREAD].forEach(ox => {
+      const leg = new THREE.Mesh(new THREE.CylinderGeometry(LEG_R, LEG_R * 0.85, LEG_H, SEG), tm5ShortsMat);
+      leg.position.set(ox, LEG_H / 2, 0); mTm5Group.add(leg);
+      const boot = new THREE.Mesh(new THREE.CylinderGeometry(BOOT_R, BOOT_R, BOOT_H, SEG), tm5BootMat);
+      boot.position.set(ox, BOOT_H / 2, 0); mTm5Group.add(boot);
+    });
+    const tm5Shorts = new THREE.Mesh(new THREE.CylinderGeometry(TORSO_R, TORSO_R * 0.9, SHORTS_H, SEG), tm5ShortsMat);
+    tm5Shorts.position.y = LEG_H + SHORTS_H / 2; mTm5Group.add(tm5Shorts);
+    const tm5Jersey = new THREE.Mesh(new THREE.CylinderGeometry(TORSO_R * 0.95, TORSO_R, TORSO_H, SEG), tm5JerseyMat);
+    tm5Jersey.position.y = LEG_H + SHORTS_H + TORSO_H / 2; mTm5Group.add(tm5Jersey);
+    const tm5ShoulderY = LEG_H + SHORTS_H + TORSO_H * 0.75;
+    [-1, 1].forEach(side => {
+      const arm = new THREE.Mesh(new THREE.CylinderGeometry(ARM_R, ARM_R * 0.85, ARM_H, SEG), tm5JerseyMat);
+      arm.position.set(side * (TORSO_R + ARM_R * 0.6), tm5ShoulderY - ARM_H / 2 + 0.045, 0);
+      mTm5Group.add(arm);
+    });
+    const tm5Head = new THREE.Mesh(new THREE.SphereGeometry(HEAD_R, SEG, SEG), tm5SkinMat);
+    tm5Head.position.y = LEG_H + SHORTS_H + TORSO_H + HEAD_R + 0.05; mTm5Group.add(tm5Head);
+    const TM5_HOME = { x: 0, z: 48 };
+    mTm5Group.position.set(TM5_HOME.x, 0, TM5_HOME.z);
+    let mTm5PassTimer = 0;
+    mScene.add(mTm5Group);
+
+    // RB teammate — right-back, home at (+20, +35), pass only toward negative z (never shoots)
+    const mTm6Group = new THREE.Group();
+    const tm6JerseyMat = new THREE.MeshLambertMaterial({ color: mJerseyColor });
+    const tm6ShortsMat = new THREE.MeshLambertMaterial({ color: mShortsColor });
+    const tm6SkinMat   = new THREE.MeshLambertMaterial({ color: 0xd4a57a });
+    const tm6BootMat   = new THREE.MeshLambertMaterial({ color: 0x222222 });
+    [-LEG_SPREAD, LEG_SPREAD].forEach(ox => {
+      const leg = new THREE.Mesh(new THREE.CylinderGeometry(LEG_R, LEG_R * 0.85, LEG_H, SEG), tm6ShortsMat);
+      leg.position.set(ox, LEG_H / 2, 0); mTm6Group.add(leg);
+      const boot = new THREE.Mesh(new THREE.CylinderGeometry(BOOT_R, BOOT_R, BOOT_H, SEG), tm6BootMat);
+      boot.position.set(ox, BOOT_H / 2, 0); mTm6Group.add(boot);
+    });
+    const tm6Shorts = new THREE.Mesh(new THREE.CylinderGeometry(TORSO_R, TORSO_R * 0.9, SHORTS_H, SEG), tm6ShortsMat);
+    tm6Shorts.position.y = LEG_H + SHORTS_H / 2; mTm6Group.add(tm6Shorts);
+    const tm6Jersey = new THREE.Mesh(new THREE.CylinderGeometry(TORSO_R * 0.95, TORSO_R, TORSO_H, SEG), tm6JerseyMat);
+    tm6Jersey.position.y = LEG_H + SHORTS_H + TORSO_H / 2; mTm6Group.add(tm6Jersey);
+    const tm6ShoulderY = LEG_H + SHORTS_H + TORSO_H * 0.75;
+    [-1, 1].forEach(side => {
+      const arm = new THREE.Mesh(new THREE.CylinderGeometry(ARM_R, ARM_R * 0.85, ARM_H, SEG), tm6JerseyMat);
+      arm.position.set(side * (TORSO_R + ARM_R * 0.6), tm6ShoulderY - ARM_H / 2 + 0.045, 0);
+      mTm6Group.add(arm);
+    });
+    const tm6Head = new THREE.Mesh(new THREE.SphereGeometry(HEAD_R, SEG, SEG), tm6SkinMat);
+    tm6Head.position.y = LEG_H + SHORTS_H + TORSO_H + HEAD_R + 0.05; mTm6Group.add(tm6Head);
+    const TM6_HOME = { x: 20, z: 35 };
+    mTm6Group.position.set(TM6_HOME.x, 0, TM6_HOME.z);
+    let mTm6PassTimer = 0;
+    mScene.add(mTm6Group);
+
+    // CM teammate — central midfielder, home at (0, +10), pass only toward negative z (never shoots)
+    const mTm7Group = new THREE.Group();
+    const tm7JerseyMat = new THREE.MeshLambertMaterial({ color: mJerseyColor });
+    const tm7ShortsMat = new THREE.MeshLambertMaterial({ color: mShortsColor });
+    const tm7SkinMat   = new THREE.MeshLambertMaterial({ color: 0xd4a57a });
+    const tm7BootMat   = new THREE.MeshLambertMaterial({ color: 0x222222 });
+    [-LEG_SPREAD, LEG_SPREAD].forEach(ox => {
+      const leg = new THREE.Mesh(new THREE.CylinderGeometry(LEG_R, LEG_R * 0.85, LEG_H, SEG), tm7ShortsMat);
+      leg.position.set(ox, LEG_H / 2, 0); mTm7Group.add(leg);
+      const boot = new THREE.Mesh(new THREE.CylinderGeometry(BOOT_R, BOOT_R, BOOT_H, SEG), tm7BootMat);
+      boot.position.set(ox, BOOT_H / 2, 0); mTm7Group.add(boot);
+    });
+    const tm7Shorts = new THREE.Mesh(new THREE.CylinderGeometry(TORSO_R, TORSO_R * 0.9, SHORTS_H, SEG), tm7ShortsMat);
+    tm7Shorts.position.y = LEG_H + SHORTS_H / 2; mTm7Group.add(tm7Shorts);
+    const tm7Jersey = new THREE.Mesh(new THREE.CylinderGeometry(TORSO_R * 0.95, TORSO_R, TORSO_H, SEG), tm7JerseyMat);
+    tm7Jersey.position.y = LEG_H + SHORTS_H + TORSO_H / 2; mTm7Group.add(tm7Jersey);
+    const tm7ShoulderY = LEG_H + SHORTS_H + TORSO_H * 0.75;
+    [-1, 1].forEach(side => {
+      const arm = new THREE.Mesh(new THREE.CylinderGeometry(ARM_R, ARM_R * 0.85, ARM_H, SEG), tm7JerseyMat);
+      arm.position.set(side * (TORSO_R + ARM_R * 0.6), tm7ShoulderY - ARM_H / 2 + 0.045, 0);
+      mTm7Group.add(arm);
+    });
+    const tm7Head = new THREE.Mesh(new THREE.SphereGeometry(HEAD_R, SEG, SEG), tm7SkinMat);
+    tm7Head.position.y = LEG_H + SHORTS_H + TORSO_H + HEAD_R + 0.05; mTm7Group.add(tm7Head);
+    const TM7_HOME = { x: 0, z: 10 };
+    mTm7Group.position.set(TM7_HOME.x, 0, TM7_HOME.z);
+    let mTm7PassTimer = 0;
+    mScene.add(mTm7Group);
+
+    // RW teammate — right winger, home at (+20, -20), shoots within 25m of z=-52.5, else passes toward negative z
+    const mTm8Group = new THREE.Group();
+    const tm8JerseyMat = new THREE.MeshLambertMaterial({ color: mJerseyColor });
+    const tm8ShortsMat = new THREE.MeshLambertMaterial({ color: mShortsColor });
+    const tm8SkinMat   = new THREE.MeshLambertMaterial({ color: 0xd4a57a });
+    const tm8BootMat   = new THREE.MeshLambertMaterial({ color: 0x222222 });
+    [-LEG_SPREAD, LEG_SPREAD].forEach(ox => {
+      const leg = new THREE.Mesh(new THREE.CylinderGeometry(LEG_R, LEG_R * 0.85, LEG_H, SEG), tm8ShortsMat);
+      leg.position.set(ox, LEG_H / 2, 0); mTm8Group.add(leg);
+      const boot = new THREE.Mesh(new THREE.CylinderGeometry(BOOT_R, BOOT_R, BOOT_H, SEG), tm8BootMat);
+      boot.position.set(ox, BOOT_H / 2, 0); mTm8Group.add(boot);
+    });
+    const tm8Shorts = new THREE.Mesh(new THREE.CylinderGeometry(TORSO_R, TORSO_R * 0.9, SHORTS_H, SEG), tm8ShortsMat);
+    tm8Shorts.position.y = LEG_H + SHORTS_H / 2; mTm8Group.add(tm8Shorts);
+    const tm8Jersey = new THREE.Mesh(new THREE.CylinderGeometry(TORSO_R * 0.95, TORSO_R, TORSO_H, SEG), tm8JerseyMat);
+    tm8Jersey.position.y = LEG_H + SHORTS_H + TORSO_H / 2; mTm8Group.add(tm8Jersey);
+    const tm8ShoulderY = LEG_H + SHORTS_H + TORSO_H * 0.75;
+    [-1, 1].forEach(side => {
+      const arm = new THREE.Mesh(new THREE.CylinderGeometry(ARM_R, ARM_R * 0.85, ARM_H, SEG), tm8JerseyMat);
+      arm.position.set(side * (TORSO_R + ARM_R * 0.6), tm8ShoulderY - ARM_H / 2 + 0.045, 0);
+      mTm8Group.add(arm);
+    });
+    const tm8Head = new THREE.Mesh(new THREE.SphereGeometry(HEAD_R, SEG, SEG), tm8SkinMat);
+    tm8Head.position.y = LEG_H + SHORTS_H + TORSO_H + HEAD_R + 0.05; mTm8Group.add(tm8Head);
+    const TM8_HOME = { x: 20, z: -5 };
+    mTm8Group.position.set(TM8_HOME.x, 0, TM8_HOME.z);
+    let mTm8PassTimer = 0;
+    mScene.add(mTm8Group);
+
     // Previous positions for velocity estimation (predictive passing)
     const mPrev = {
       player: { x: 0, z: 20 },
@@ -2406,6 +2522,10 @@
       tm2:    { x: TM2_HOME.x, z: TM2_HOME.z },
       tm3:    { x: TM3_HOME.x, z: TM3_HOME.z  },
       tm4:    { x: TM4_HOME.x, z: TM4_HOME.z  },
+      tm5:    { x: TM5_HOME.x, z: TM5_HOME.z  },
+      tm6:    { x: TM6_HOME.x, z: TM6_HOME.z  },
+      tm7:    { x: TM7_HOME.x, z: TM7_HOME.z  },
+      tm8:    { x: TM8_HOME.x, z: TM8_HOME.z  },
     };
 
     const M_SPEED = 0.12;
@@ -2573,12 +2693,20 @@
         tm2:    { x: mTm2Group.position.x - mPrev.tm2.x, z: mTm2Group.position.z - mPrev.tm2.z },
         tm3:    { x: mTm3Group.position.x - mPrev.tm3.x, z: mTm3Group.position.z - mPrev.tm3.z },
         tm4:    { x: mTm4Group.position.x - mPrev.tm4.x, z: mTm4Group.position.z - mPrev.tm4.z },
+        tm5:    { x: mTm5Group.position.x - mPrev.tm5.x, z: mTm5Group.position.z - mPrev.tm5.z },
+        tm6:    { x: mTm6Group.position.x - mPrev.tm6.x, z: mTm6Group.position.z - mPrev.tm6.z },
+        tm7:    { x: mTm7Group.position.x - mPrev.tm7.x, z: mTm7Group.position.z - mPrev.tm7.z },
+        tm8:    { x: mTm8Group.position.x - mPrev.tm8.x, z: mTm8Group.position.z - mPrev.tm8.z },
       };
       mPrev.player.x = mPlayerGroup.position.x; mPrev.player.z = mPlayerGroup.position.z;
       mPrev.tm.x     = mTmGroup.position.x;     mPrev.tm.z     = mTmGroup.position.z;
       mPrev.tm2.x    = mTm2Group.position.x;    mPrev.tm2.z    = mTm2Group.position.z;
       mPrev.tm3.x    = mTm3Group.position.x;    mPrev.tm3.z    = mTm3Group.position.z;
       mPrev.tm4.x    = mTm4Group.position.x;    mPrev.tm4.z    = mTm4Group.position.z;
+      mPrev.tm5.x    = mTm5Group.position.x;    mPrev.tm5.z    = mTm5Group.position.z;
+      mPrev.tm6.x    = mTm6Group.position.x;    mPrev.tm6.z    = mTm6Group.position.z;
+      mPrev.tm7.x    = mTm7Group.position.x;    mPrev.tm7.z    = mTm7Group.position.z;
+      mPrev.tm8.x    = mTm8Group.position.x;    mPrev.tm8.z    = mTm8Group.position.z;
 
       // Shared teammate helper — pass toward predicted position of closest forward target.
       // attackDirZ: -1 = player's team (attack toward z=-52.5), +1 = opponent (attack toward z=+52.5).
@@ -2590,6 +2718,10 @@
           { group: mTm2Group,    vel: mVel.tm2    },
           { group: mTm3Group,    vel: mVel.tm3    },
           { group: mTm4Group,    vel: mVel.tm4    },
+          { group: mTm5Group,    vel: mVel.tm5    },
+          { group: mTm6Group,    vel: mVel.tm6    },
+          { group: mTm7Group,    vel: mVel.tm7    },
+          { group: mTm8Group,    vel: mVel.tm8    },
         ].filter(c => c.group !== fromGroup)
          .filter(c => attackDirZ * c.group.position.z > attackDirZ * fromGroup.position.z);
         let best = null, bestDist = Infinity;
@@ -2677,6 +2809,31 @@
       if (tm4BallDist <= 1.5 && mTm4PassTimer === 0) {
         if (!tmPass(mTm4Group, mTm4PassTimer, v => mTm4PassTimer = v, -1))
           tmDribbleFwd(mTm4Group, TM4_HOME, 12, -1, v => mTm4PassTimer = v);
+      }
+      // GK — very tight zone, pass only toward negative z (never shoots, never leaves zone)
+      mTm5PassTimer = Math.max(0, mTm5PassTimer - 1);
+      const tm5BallDist = tmMove(mTm5Group, TM5_HOME, 8, TM_SPEED);
+      if (tm5BallDist <= 1.5 && mTm5PassTimer === 0) {
+        if (!tmPass(mTm5Group, mTm5PassTimer, v => mTm5PassTimer = v, -1)) mTm5PassTimer = 30;
+      }
+      // RB — tight zone, pass only toward negative z (never shoots)
+      mTm6PassTimer = Math.max(0, mTm6PassTimer - 1);
+      const tm6BallDist = tmMove(mTm6Group, TM6_HOME, 12, TM_SPEED);
+      if (tm6BallDist <= 1.5 && mTm6PassTimer === 0) {
+        if (!tmPass(mTm6Group, mTm6PassTimer, v => mTm6PassTimer = v, -1)) mTm6PassTimer = 30;
+      }
+      // CM — zone, pass only toward negative z (never shoots)
+      mTm7PassTimer = Math.max(0, mTm7PassTimer - 1);
+      const tm7BallDist = tmMove(mTm7Group, TM7_HOME, 15, TM_SPEED);
+      if (tm7BallDist <= 1.5 && mTm7PassTimer === 0) {
+        if (!tmPass(mTm7Group, mTm7PassTimer, v => mTm7PassTimer = v, -1)) mTm7PassTimer = 30;
+      }
+      // RW — zone, passes toward negative z; dribbles forward (can shoot within 25m of z=-52.5)
+      mTm8PassTimer = Math.max(0, mTm8PassTimer - 1);
+      const tm8BallDist = tmMove(mTm8Group, TM8_HOME, TM_ENGAGE, TM_SPEED);
+      if (tm8BallDist <= 1.5 && mTm8PassTimer === 0) {
+        if (!tmPass(mTm8Group, mTm8PassTimer, v => mTm8PassTimer = v, -1))
+          tmDribbleFwd(mTm8Group, TM8_HOME, TM_ENGAGE, -1, v => mTm8PassTimer = v);
       }
 
       updateMatchCamera();
