@@ -518,7 +518,29 @@
       pointer-events: none;
       z-index: 5;
       letter-spacing: 0.1em;
+      display: flex;
+      align-items: center;
+      gap: 0.6em;
+      white-space: nowrap;
     }
+    #match-score-home, #match-score-away { font-size: 1rem; opacity: 0.85; }
+    #match-score-num { font-size: 1.5rem; }
+    #match-timer {
+      position: absolute; top: 1rem; right: 1.5rem;
+      left: auto; transform: none;
+      color: #fff; font-size: 1rem; font-weight: 600;
+      text-shadow: 0 1px 4px rgba(0,0,0,0.8);
+      pointer-events: none; z-index: 5;
+    }
+    #match-status {
+      position: absolute; top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      color: #fff; font-size: 2rem; font-weight: 700;
+      text-shadow: 0 2px 8px rgba(0,0,0,0.9);
+      pointer-events: none; z-index: 6;
+      opacity: 0; transition: opacity 0.4s;
+    }
+    #match-status.visible { opacity: 1; }
     #match-goal-flash {
       position: absolute;
       inset: 0;
@@ -1285,8 +1307,10 @@
   <div id="match-screen">
     <button class="btn back-btn" onclick="showScreen('prematch')" style="position:relative;z-index:1;">← Back</button>
     <canvas id="match-canvas" style="position:absolute;inset:0;width:100%;height:100%;display:block;"></canvas>
-    <div id="match-score">0 – 0</div>
+    <div id="match-score"><span id="match-score-home">Home</span> <span id="match-score-num">0 – 0</span> <span id="match-score-away">Away</span></div>
     <div id="match-goal-flash">GOAL!</div>
+    <div id="match-timer">0'</div>
+    <div id="match-status"></div>
     <div id="power-bar-wrap"><div id="power-bar-fill"></div></div>
   </div>
 
@@ -2140,7 +2164,39 @@
     let mScoreHome = 0, mScoreAway = 0;
     let mGoalPending = false;
     const mScoreEl     = document.getElementById('match-score');
+    const mScoreNumEl  = document.getElementById('match-score-num');
+    const mScoreHomeEl = document.getElementById('match-score-home');
+    const mScoreAwayEl = document.getElementById('match-score-away');
     const mGoalFlashEl = document.getElementById('match-goal-flash');
+    const mTimerEl     = document.getElementById('match-timer');
+    const mStatusEl    = document.getElementById('match-status');
+    // 8 real minutes = 90 in-game minutes at 60fps → 28800 frames total; 320 frames per minute
+    const M_FRAMES_PER_MIN = 320;
+    const M_HALF_FRAMES = 45 * M_FRAMES_PER_MIN;
+    const M_FULL_FRAMES = 90 * M_FRAMES_PER_MIN;
+    let mTimerFrames = 0, mTimerPaused = false, mTimerDone = false;
+    // Pick opponent club from same league
+    const LEAGUES = {
+      'Man City':     ['Liverpool','Arsenal','Chelsea','Man Utd','Tottenham'],
+      'Liverpool':    ['Man City','Arsenal','Chelsea','Man Utd','Tottenham'],
+      'Chelsea':      ['Man City','Liverpool','Arsenal','Man Utd','Tottenham'],
+      'Real Madrid':  ['Barcelona','Atletico','Sevilla','Valencia','Villarreal'],
+      'Barcelona':    ['Real Madrid','Atletico','Sevilla','Valencia','Villarreal'],
+      'Bayern Munich':['Dortmund','Leipzig','Leverkusen','Frankfurt','Stuttgart'],
+      'Dortmund':     ['Bayern Munich','Leipzig','Leverkusen','Frankfurt','Stuttgart'],
+      'PSG':          ['Lyon','Marseille','Monaco','Lille','Nice'],
+      'Juventus':     ['AC Milan','Inter','Napoli','Roma','Lazio'],
+      'AC Milan':     ['Juventus','Inter','Napoli','Roma','Lazio'],
+      'Ajax':         ['PSV','Feyenoord','AZ','Utrecht','Twente'],
+      'Porto':        ['Benfica','Sporting','Braga','Guimaraes','Vitoria'],
+    };
+    function mUpdateScoreboardClubs() {
+      const _playerClub = (playerData && playerData.club) || '';
+      const _oppPool = LEAGUES[_playerClub] || [];
+      const _oppClub = _oppPool.length ? _oppPool[Math.floor(Math.random() * _oppPool.length)] : '';
+      mScoreHomeEl.textContent = _playerClub;
+      mScoreAwayEl.textContent = _oppClub;
+    }
 
     function mResetKickoff() {
       mBall.position.set(0, M_BALL_R, 0);
@@ -2168,8 +2224,22 @@
 
     function mTriggerGoal() {
       mGoalPending = true;
-      mBallVel.x = 0; mBallVel.y = 0; mBallVel.z = 0;
-      mScoreEl.textContent = mScoreHome + ' – ' + mScoreAway;
+      // Keep ball rolling into the net — stop it when it hits the back panel (z = ±(52.5+NET_D))
+      const _goalNetZ = 52.5 + NET_D - M_BALL_R;
+      const _goalDir  = mBall.position.z > 0 ? 1 : -1;
+      function _waitForNet() {
+        if (_goalDir * mBall.position.z < _goalNetZ - 0.05) {
+          mBall.position.z += mBallVel.z * 0.85;
+          mBall.position.x += mBallVel.x * 0.85;
+          mBall.position.y  = M_BALL_R;
+          requestAnimationFrame(_waitForNet);
+        } else {
+          mBall.position.z = _goalDir * _goalNetZ;
+          mBallVel.x = 0; mBallVel.y = 0; mBallVel.z = 0;
+        }
+      }
+      _waitForNet();
+      mScoreNumEl.textContent = mScoreHome + ' – ' + mScoreAway;
       mGoalFlashEl.classList.add('visible');
       setTimeout(() => {
         mGoalFlashEl.classList.remove('visible');
@@ -2184,6 +2254,44 @@
     );
     mBall.position.set(0, 0.22, 0);
     mScene.add(mBall);
+
+    // Stadium stands — 5 tiered rows per side
+    const standMat = new THREE.MeshLambertMaterial({ color: 0x1a237e });
+    const ROWS = 5, ROW_H = 1.8, ROW_D = 3.2;
+    // sides: { width along stand, distance from pitch centre, axis ('z'|'x'), sign }
+    const sides = [
+      { w: 90,  dist: 58, axis: 'z', sign:  1 },  // north
+      { w: 90,  dist: 58, axis: 'z', sign: -1 },  // south
+      { w: 130, dist: 68, axis: 'x', sign:  1 },  // east
+      { w: 130, dist: 68, axis: 'x', sign: -1 },  // west
+    ];
+    sides.forEach(s => {
+      for (let r = 0; r < ROWS; r++) {
+        const mesh = new THREE.Mesh(new THREE.BoxGeometry(s.w, ROW_H, ROW_D), standMat);
+        const offset = s.dist + r * ROW_D;
+        const rise   = ROW_H * 0.5 + r * ROW_H;
+        if (s.axis === 'z') {
+          mesh.position.set(0, rise, s.sign * offset);
+        } else {
+          mesh.rotation.y = Math.PI / 2;
+          mesh.position.set(s.sign * offset, rise, 0);
+        }
+        mScene.add(mesh);
+      }
+    });
+    // Corner fills — close gaps between north/south and east/west stands at all 4 corners
+    for (let r = 0; r < ROWS; r++) {
+      const cw   = 23 + r * ROW_D;           // corner width in x
+      const rise = ROW_H * 0.5 + r * ROW_H;
+      const cx   = 45 + cw / 2;              // centre x of corner box
+      const cz   = 58 + r * ROW_D;           // centre z of corner box (aligns with N/S row)
+      [1, -1].forEach(sx => [1, -1].forEach(sz => {
+        const c = new THREE.Mesh(new THREE.BoxGeometry(cw, ROW_H, ROW_D), standMat);
+        c.position.set(sx * cx, rise, sz * cz);
+        mScene.add(c);
+      }));
+    }
+
     const mBallVel = { x: 0, y: 0, z: 0 };
     const M_GRAVITY = 0.012;
     const M_BALL_R  = 0.22;
@@ -2535,8 +2643,8 @@
 
     // Second teammate — left wing position, same humanoid + kit
     const mTm2Group = new THREE.Group();
-    const tm2JerseyMat = new THREE.MeshLambertMaterial({ color: mJerseyColor });
-    const tm2ShortsMat = new THREE.MeshLambertMaterial({ color: mShortsColor });
+    const tm2JerseyMat = new THREE.MeshLambertMaterial({ color: 0xcc1111 });
+    const tm2ShortsMat = new THREE.MeshLambertMaterial({ color: 0xffffff });
     const tm2SkinMat   = new THREE.MeshLambertMaterial({ color: 0xd4a57a });
     const tm2BootMat   = new THREE.MeshLambertMaterial({ color: 0x222222 });
     [-LEG_SPREAD, LEG_SPREAD].forEach(ox => {
@@ -2735,6 +2843,34 @@
     mTm8Group.position.set(TM8_HOME.x, 0, TM8_HOME.z);
     let mTm8PassTimer = 0;
     mScene.add(mTm8Group);
+    // LW2 — left winger, home at (-20, -20), can shoot within 25m of opponent's goal
+    const mTm9Group = new THREE.Group();
+    const tm9JerseyMat = new THREE.MeshLambertMaterial({ color: mJerseyColor });
+    const tm9ShortsMat = new THREE.MeshLambertMaterial({ color: mShortsColor });
+    const tm9SkinMat   = new THREE.MeshLambertMaterial({ color: 0xd4a57a });
+    const tm9BootMat   = new THREE.MeshLambertMaterial({ color: 0x222222 });
+    [-LEG_SPREAD, LEG_SPREAD].forEach(ox => {
+      const leg = new THREE.Mesh(new THREE.CylinderGeometry(LEG_R, LEG_R * 0.85, LEG_H, SEG), tm9ShortsMat);
+      leg.position.set(ox, LEG_H / 2, 0); mTm9Group.add(leg);
+      const boot = new THREE.Mesh(new THREE.CylinderGeometry(BOOT_R, BOOT_R, BOOT_H, SEG), tm9BootMat);
+      boot.position.set(ox, BOOT_H / 2, 0); mTm9Group.add(boot);
+    });
+    const tm9Shorts = new THREE.Mesh(new THREE.CylinderGeometry(TORSO_R, TORSO_R * 0.9, SHORTS_H, SEG), tm9ShortsMat);
+    tm9Shorts.position.y = LEG_H + SHORTS_H / 2; mTm9Group.add(tm9Shorts);
+    const tm9Jersey = new THREE.Mesh(new THREE.CylinderGeometry(TORSO_R * 0.95, TORSO_R, TORSO_H, SEG), tm9JerseyMat);
+    tm9Jersey.position.y = LEG_H + SHORTS_H + TORSO_H / 2; mTm9Group.add(tm9Jersey);
+    const tm9ShoulderY = LEG_H + SHORTS_H + TORSO_H * 0.75;
+    [-1, 1].forEach(side => {
+      const arm = new THREE.Mesh(new THREE.CylinderGeometry(ARM_R, ARM_R * 0.85, ARM_H, SEG), tm9JerseyMat);
+      arm.position.set(side * (TORSO_R + ARM_R * 0.6), tm9ShoulderY - ARM_H / 2 + 0.045, 0);
+      mTm9Group.add(arm);
+    });
+    const tm9Head = new THREE.Mesh(new THREE.SphereGeometry(HEAD_R, SEG, SEG), tm9SkinMat);
+    tm9Head.position.y = LEG_H + SHORTS_H + TORSO_H + HEAD_R + 0.05; mTm9Group.add(tm9Head);
+    const TM9_HOME = { x: -20, z: -20 };
+    mTm9Group.position.set(TM9_HOME.x, 0, TM9_HOME.z);
+    let mTm9PassTimer = 0;
+    mScene.add(mTm9Group);
 
     // Previous positions for velocity estimation (predictive passing)
     const mPrev = {
@@ -2747,6 +2883,7 @@
       tm6:    { x: TM6_HOME.x, z: TM6_HOME.z  },
       tm7:    { x: TM7_HOME.x, z: TM7_HOME.z  },
       tm8:    { x: TM8_HOME.x, z: TM8_HOME.z  },
+      tm9:    { x: TM9_HOME.x, z: TM9_HOME.z  },
       aiStr:  { x: AI_HOME.x,    z: AI_HOME.z    },
       aiGk:   { x: AI_GK_HOME.x, z: AI_GK_HOME.z },
       aiCb:   { x: AI_CB_HOME.x, z: AI_CB_HOME.z },
@@ -2796,10 +2933,10 @@
 
       // Player movement in local XZ
       let mdx = 0, mdz = 0;
-      if (tKeys['w'] || tKeys['W'] || tKeys['ArrowUp'])    mdz -= 1;
-      if (tKeys['s'] || tKeys['S'] || tKeys['ArrowDown'])  mdz += 1;
-      if (tKeys['a'] || tKeys['A'] || tKeys['ArrowLeft'])  mdx -= 1;
-      if (tKeys['d'] || tKeys['D'] || tKeys['ArrowRight']) mdx += 1;
+      if (mKeys['KeyW'] || mKeys['ArrowUp'])    mdz -= 1;
+      if (mKeys['KeyS'] || mKeys['ArrowDown'])  mdz += 1;
+      if (mKeys['KeyA'] || mKeys['ArrowLeft'])  mdx -= 1;
+      if (mKeys['KeyD'] || mKeys['ArrowRight']) mdx += 1;
 
       if (mdx !== 0 || mdz !== 0) {
         const len = Math.sqrt(mdx * mdx + mdz * mdz);
@@ -2807,8 +2944,8 @@
         const rx = Math.sin(mCamYaw + Math.PI / 2), rz = Math.cos(mCamYaw + Math.PI / 2);
         const wx = (mdz * fx + mdx * rx) / len * M_SPEED;
         const wz = (mdz * fz + mdx * rz) / len * M_SPEED;
-        mPlayerGroup.position.x = Math.max(-38.075, Math.min(38.075, mPlayerGroup.position.x + wx));
-        mPlayerGroup.position.z = Math.max(-56.575, Math.min(56.575, mPlayerGroup.position.z + wz));
+        mPlayerGroup.position.x = Math.max(-38, Math.min(38, mPlayerGroup.position.x + wx));
+        mPlayerGroup.position.z = Math.max(-56, Math.min(56, mPlayerGroup.position.z + wz));
         mPlayerGroup.rotation.y = Math.atan2(wx, wz);
       }
 
@@ -2819,6 +2956,28 @@
       mCheckGoal();
       if (mGoalPending) { updateMatchCamera(); mRenderer.render(mScene, mCamera); mLoopId = requestAnimationFrame(matchLoop); return; }
 
+      // Match timer
+      if (!mTimerPaused && !mTimerDone) {
+        mTimerFrames++;
+        const mMin = Math.min(90, Math.floor(mTimerFrames / M_FRAMES_PER_MIN));
+        mTimerEl.textContent = mMin + "'";
+        if (!mTimerPaused && mTimerFrames === M_HALF_FRAMES) {
+          mTimerPaused = true;
+          mStatusEl.textContent = 'Half Time'; mStatusEl.classList.add('visible');
+          setTimeout(() => {
+            mStatusEl.classList.remove('visible');
+            mTimerPaused = false;
+          }, 3000);
+        }
+        if (mTimerFrames >= M_FULL_FRAMES && !mTimerDone) {
+          mTimerDone = true;
+          mTimerEl.textContent = "90'";
+          mStatusEl.textContent = 'Full Time  ' + mScoreHome + ' – ' + mScoreAway;
+          mStatusEl.classList.add('visible');
+        }
+      }
+      if (mTimerDone) { updateMatchCamera(); mRenderer.render(mScene, mCamera); mLoopId = requestAnimationFrame(matchLoop); return; }
+
       // Ball physics — gravity + air drag (always) + ground friction
       mBallVel.y -= M_GRAVITY;
       mBallVel.x *= 0.993; // light air drag every frame
@@ -2827,9 +2986,9 @@
       mBall.position.y += mBallVel.y;
       mBall.position.z += mBallVel.z;
 
-      // Pitch boundary walls
-      if (mBall.position.x < -38.425 + M_BALL_R)  { mBall.position.x = -38.425 + M_BALL_R;  mBallVel.x =  Math.abs(mBallVel.x); }
-      if (mBall.position.x >  38.425 - M_BALL_R)  { mBall.position.x =  38.425 - M_BALL_R;  mBallVel.x = -Math.abs(mBallVel.x); }
+      // Pitch boundary walls — ball stops at white lines (touchlines x=±34, goal lines z=±52.5)
+      if (mBall.position.x < -34 + M_BALL_R)  { mBall.position.x = -34 + M_BALL_R;  mBallVel.x =  Math.abs(mBallVel.x); }
+      if (mBall.position.x >  34 - M_BALL_R)  { mBall.position.x =  34 - M_BALL_R;  mBallVel.x = -Math.abs(mBallVel.x); }
       const inGoalOpening = Math.abs(mBall.position.x) < GW / 2 && mBall.position.y < GH;
       if (mBall.position.z < -52.5 + M_BALL_R && !inGoalOpening) { mBall.position.z = -52.5 + M_BALL_R; mBallVel.z =  Math.abs(mBallVel.z); }
       if (mBall.position.z >  52.5 - M_BALL_R && !inGoalOpening) { mBall.position.z =  52.5 - M_BALL_R; mBallVel.z = -Math.abs(mBallVel.z); }
@@ -2873,6 +3032,7 @@
       const TM6_HOME_E = _tm(TM6_HOME,  10, 48);
       const TM7_HOME_E = _tm(TM7_HOME, -10, 35);
       const TM8_HOME_E = _tm(TM8_HOME, -20, 25);
+      const TM9_HOME_E = _tm(TM9_HOME, -30, 15);
       const AI_HOME_E    = _ai(AI_HOME,    -5, 40);
       const AI_GK_HOME_E = _ai(AI_GK_HOME,-51,-38);
       const AI_CB_HOME_E = _ai(AI_CB_HOME,-48,-10);
@@ -2951,6 +3111,7 @@
         tm6:    { x: mTm6Group.position.x - mPrev.tm6.x, z: mTm6Group.position.z - mPrev.tm6.z },
         tm7:    { x: mTm7Group.position.x - mPrev.tm7.x, z: mTm7Group.position.z - mPrev.tm7.z },
         tm8:    { x: mTm8Group.position.x - mPrev.tm8.x, z: mTm8Group.position.z - mPrev.tm8.z },
+        tm9:    { x: mTm9Group.position.x - mPrev.tm9.x, z: mTm9Group.position.z - mPrev.tm9.z },
         aiGk:   { x: mAiGkGroup.position.x - mPrev.aiGk.x, z: mAiGkGroup.position.z - mPrev.aiGk.z },
         aiCb:   { x: mAiCbGroup.position.x - mPrev.aiCb.x, z: mAiCbGroup.position.z - mPrev.aiCb.z },
         aiLb:   { x: mAiLbGroup.position.x - mPrev.aiLb.x, z: mAiLbGroup.position.z - mPrev.aiLb.z },
@@ -2970,6 +3131,7 @@
       mPrev.tm6.x    = mTm6Group.position.x;    mPrev.tm6.z    = mTm6Group.position.z;
       mPrev.tm7.x    = mTm7Group.position.x;    mPrev.tm7.z    = mTm7Group.position.z;
       mPrev.tm8.x    = mTm8Group.position.x;    mPrev.tm8.z    = mTm8Group.position.z;
+      mPrev.tm9.x    = mTm9Group.position.x;    mPrev.tm9.z    = mTm9Group.position.z;
       mPrev.aiStr.x  = mAiGroup.position.x;     mPrev.aiStr.z  = mAiGroup.position.z;
       mPrev.aiGk.x   = mAiGkGroup.position.x;   mPrev.aiGk.z   = mAiGkGroup.position.z;
       mPrev.aiCb.x   = mAiCbGroup.position.x;   mPrev.aiCb.z   = mAiCbGroup.position.z;
@@ -2995,6 +3157,7 @@
           { group: mTm6Group,    vel: mVel.tm6    },
           { group: mTm7Group,    vel: mVel.tm7    },
           { group: mTm8Group,    vel: mVel.tm8    },
+          { group: mTm9Group,    vel: mVel.tm9    },
         ].filter(c => c.group !== fromGroup)
          .filter(c => attackDirZ * c.group.position.z > attackDirZ * fromGroup.position.z);
         const fallback = candidates.length === 0
@@ -3103,6 +3266,15 @@
       if (tm5BallDist <= 1.5 && mTm5PassTimer === 0) {
         if (!tmPass(mTm5Group, mTm5PassTimer, v => mTm5PassTimer = v, -1)) mTm5PassTimer = 30;
       }
+      // GK save — slide toward predicted ball x when shot is coming toward player's goal (+z)
+      if (mBallVel.z > 0.05 && mBall.position.z > 5) {
+        const tm5GoalZ = 52.5;
+        const tm5Frames = mBallVel.z > 0 ? (tm5GoalZ - mBall.position.z) / mBallVel.z : 0;
+        const tm5PredX = mBall.position.x + mBallVel.x * tm5Frames;
+        const tm5ClampX = Math.max(-7, Math.min(7, tm5PredX));
+        const tm5Dx = tm5ClampX - mTm5Group.position.x;
+        if (Math.abs(tm5Dx) > 0.1) mTm5Group.position.x += tm5Dx * 0.084;
+      }
       // RB — tight zone, pass only toward negative z (never shoots)
       mTm6PassTimer = Math.max(0, mTm6PassTimer - 1);
       const tm6BallDist = tmMove(mTm6Group, TM6_HOME_E, 12, TM_SPEED);
@@ -3121,6 +3293,13 @@
       if (tm8BallDist <= 1.5 && mTm8PassTimer === 0) {
         if (!tmPass(mTm8Group, mTm8PassTimer, v => mTm8PassTimer = v, -1))
           tmDribbleFwd(mTm8Group, TM8_HOME_E, TM_ENGAGE, -1, v => mTm8PassTimer = v);
+      }
+      // LW2 — zone, passes toward negative z; dribbles forward (can shoot within 25m of z=-52.5)
+      mTm9PassTimer = Math.max(0, mTm9PassTimer - 1);
+      const tm9BallDist = tmMove(mTm9Group, TM9_HOME_E, TM_ENGAGE, TM_SPEED);
+      if (tm9BallDist <= 1.5 && mTm9PassTimer === 0) {
+        if (!tmPass(mTm9Group, mTm9PassTimer, v => mTm9PassTimer = v, -1))
+          tmDribbleFwd(mTm9Group, TM9_HOME_E, TM_ENGAGE, -1, v => mTm9PassTimer = v);
       }
 
       // Opponent back-line — pass only toward positive z (+52.5), never shoot
@@ -3190,6 +3369,15 @@
           mAiGkGroup.position.z += (aiGkHdz / aiGkHdist) * AI_SPEED;
         }
       }
+      // Opp GK save — slide toward predicted ball x when shot is coming toward opponent's goal (-z)
+      if (mBallVel.z < -0.05 && mBall.position.z < -5) {
+        const aiGkGoalZ = -48;
+        const aiGkFrames = mBallVel.z < 0 ? (aiGkGoalZ - mBall.position.z) / mBallVel.z : 0;
+        const aiGkPredX = mBall.position.x + mBallVel.x * aiGkFrames;
+        const aiGkClampX = Math.max(-7, Math.min(7, aiGkPredX));
+        const aiGkDx = aiGkClampX - mAiGkGroup.position.x;
+        if (Math.abs(aiGkDx) > 0.1) mAiGkGroup.position.x += aiGkDx * 0.084;
+      }
       // Opponent CB — tight zone, pass toward +z only
       mAiCbPassTimer = Math.max(0, mAiCbPassTimer - 1);
       const aiCbBallDist = tmMove(mAiCbGroup, AI_CB_HOME_E, 12, TM_SPEED);
@@ -3229,16 +3417,11 @@
           mBallVel.y = 0.08;
           mAiLwPassTimer = 60;
         } else {
-          const aiLwAtEdge = mAiLwGroup.position.z >= AI_LW_HOME_E.z + TM_ENGAGE;
-          if (aiLwAtEdge) {
-            if (!aiPass(mAiLwGroup, v => mAiLwPassTimer = v)) mAiLwPassTimer = 30;
-          } else {
-            if (!aiPass(mAiLwGroup, v => mAiLwPassTimer = v)) {
-              mBallVel.z = 0.18;
-              mBallVel.x += (-mBall.position.x * 0.02);
-              mBallVel.y = 0.02;
-              mAiLwPassTimer = 25;
-            }
+          if (!aiPass(mAiLwGroup, v => mAiLwPassTimer = v)) {
+            mBallVel.z = 0.18;
+            mBallVel.x += (-mBall.position.x * 0.02);
+            mBallVel.y = 0.02;
+            mAiLwPassTimer = 25;
           }
         }
       }
@@ -3257,16 +3440,11 @@
           mBallVel.y = 0.08;
           mAiRwPassTimer = 60;
         } else {
-          const aiRwAtEdge = mAiRwGroup.position.z >= AI_RW_HOME_E.z + TM_ENGAGE;
-          if (aiRwAtEdge) {
-            if (!aiPass(mAiRwGroup, v => mAiRwPassTimer = v)) mAiRwPassTimer = 30;
-          } else {
-            if (!aiPass(mAiRwGroup, v => mAiRwPassTimer = v)) {
-              mBallVel.z = 0.18;
-              mBallVel.x += (-mBall.position.x * 0.02);
-              mBallVel.y = 0.02;
-              mAiRwPassTimer = 25;
-            }
+          if (!aiPass(mAiRwGroup, v => mAiRwPassTimer = v)) {
+            mBallVel.z = 0.18;
+            mBallVel.x += (-mBall.position.x * 0.02);
+            mBallVel.y = 0.02;
+            mAiRwPassTimer = 25;
           }
         }
       }
@@ -3334,15 +3512,26 @@
 
     // Pointer lock
     matchCanvas.addEventListener('click', () => matchCanvas.requestPointerLock());
+    const mKeys = {};
+    window.addEventListener('keydown', e => { mKeys[e.code] = true;  });
+    window.addEventListener('keyup',   e => { mKeys[e.code] = false; });
+    function mClearKeys() {
+      ['KeyW','KeyA','KeyS','KeyD','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].forEach(k => { mKeys[k] = false; });
+    }
     document.addEventListener('pointerlockchange', () => {
       matchCanvas.style.cursor = document.pointerLockElement === matchCanvas ? 'none' : 'default';
+      if (document.pointerLockElement !== matchCanvas) mClearKeys();
     });
+    window.addEventListener('blur', mClearKeys);
 
     // Hook showScreen to start/stop the match render loop
     const _showScreenMatch = showScreen;
     showScreen = function(name) {
       _showScreenMatch(name);
       if (name === 'match') {
+        mUpdateScoreboardClubs();
+        mTimerFrames = 0; mTimerPaused = false; mTimerDone = false;
+        mTimerEl.textContent = "0'"; mStatusEl.textContent = ''; mStatusEl.classList.remove('visible');
         requestAnimationFrame(() => { resizeMatchRenderer(); if (!mLoopId) matchLoop(); });
       }
     };
