@@ -2370,12 +2370,42 @@
     let mTm3PassTimer = 0;
     mScene.add(mTm3Group);
 
+    // LB teammate — left-back, home at (-20, +35), pass only (no shooting)
+    const mTm4Group = new THREE.Group();
+    const tm4JerseyMat = new THREE.MeshLambertMaterial({ color: mJerseyColor });
+    const tm4ShortsMat = new THREE.MeshLambertMaterial({ color: mShortsColor });
+    const tm4SkinMat   = new THREE.MeshLambertMaterial({ color: 0xd4a57a });
+    const tm4BootMat   = new THREE.MeshLambertMaterial({ color: 0x222222 });
+    [-LEG_SPREAD, LEG_SPREAD].forEach(ox => {
+      const leg = new THREE.Mesh(new THREE.CylinderGeometry(LEG_R, LEG_R * 0.85, LEG_H, SEG), tm4ShortsMat);
+      leg.position.set(ox, LEG_H / 2, 0); mTm4Group.add(leg);
+      const boot = new THREE.Mesh(new THREE.CylinderGeometry(BOOT_R, BOOT_R, BOOT_H, SEG), tm4BootMat);
+      boot.position.set(ox, BOOT_H / 2, 0); mTm4Group.add(boot);
+    });
+    const tm4Shorts = new THREE.Mesh(new THREE.CylinderGeometry(TORSO_R, TORSO_R * 0.9, SHORTS_H, SEG), tm4ShortsMat);
+    tm4Shorts.position.y = LEG_H + SHORTS_H / 2; mTm4Group.add(tm4Shorts);
+    const tm4Jersey = new THREE.Mesh(new THREE.CylinderGeometry(TORSO_R * 0.95, TORSO_R, TORSO_H, SEG), tm4JerseyMat);
+    tm4Jersey.position.y = LEG_H + SHORTS_H + TORSO_H / 2; mTm4Group.add(tm4Jersey);
+    const tm4ShoulderY = LEG_H + SHORTS_H + TORSO_H * 0.75;
+    [-1, 1].forEach(side => {
+      const arm = new THREE.Mesh(new THREE.CylinderGeometry(ARM_R, ARM_R * 0.85, ARM_H, SEG), tm4JerseyMat);
+      arm.position.set(side * (TORSO_R + ARM_R * 0.6), tm4ShoulderY - ARM_H / 2 + 0.045, 0);
+      mTm4Group.add(arm);
+    });
+    const tm4Head = new THREE.Mesh(new THREE.SphereGeometry(HEAD_R, SEG, SEG), tm4SkinMat);
+    tm4Head.position.y = LEG_H + SHORTS_H + TORSO_H + HEAD_R + 0.05; mTm4Group.add(tm4Head);
+    const TM4_HOME = { x: -20, z: 35 };
+    mTm4Group.position.set(TM4_HOME.x, 0, TM4_HOME.z);
+    let mTm4PassTimer = 0;
+    mScene.add(mTm4Group);
+
     // Previous positions for velocity estimation (predictive passing)
     const mPrev = {
       player: { x: 0, z: 20 },
       tm:     { x: TM_HOME.x,  z: TM_HOME.z },
       tm2:    { x: TM2_HOME.x, z: TM2_HOME.z },
       tm3:    { x: TM3_HOME.x, z: TM3_HOME.z  },
+      tm4:    { x: TM4_HOME.x, z: TM4_HOME.z  },
     };
 
     const M_SPEED = 0.12;
@@ -2493,15 +2523,31 @@
       if (aiBallHomeDist < AI_ENGAGE) {
         if (aidist <= AI_DRIBBLE_DIST) {
           if (mAiGroup.position.z > AI_SHOOT_Z) {
+            // Near player's goal — shoot
             mBallVel.x = (Math.random() - 0.5) * 0.25;
             mBallVel.z = 1.1;
             mBallVel.y = 0.12;
             mAiTouchTimer = 90;
           } else if (mAiTouchTimer === 0) {
-            mBallVel.x += (-mBall.position.x * 0.03);
-            mBallVel.z = 0.22;
-            mBallVel.y = 0.03;
-            mAiTouchTimer = 22;
+            // Pass to a forward opponent teammate (attacks toward +z); dribble forward if none
+            const aiPassCandidates = []; // no other opponent capsules defined yet
+            const hasFwdOpponent = aiPassCandidates.some(g => g.position.z > mAiGroup.position.z);
+            // Front edge of AI zone toward +z: AI_HOME.z + AI_ENGAGE = -20 + 20 = 0
+            const aiAtFrontEdge = mAiGroup.position.z >= AI_HOME.z + AI_ENGAGE;
+            const aiNearGoal    = mAiGroup.position.z > 27.5; // within 25m of z=+52.5
+            if (hasFwdOpponent) {
+              // pass (future: call tmPass when mVel available in this block)
+              mAiTouchTimer = 30;
+            } else if (aiAtFrontEdge && !aiNearGoal) {
+              // At zone boundary with no one to pass to — hold
+              mAiTouchTimer = 30;
+            } else {
+              // Dribble forward toward +z (opponent's attacking direction)
+              mBallVel.x += (-mBall.position.x * 0.03);
+              mBallVel.z = 0.22;
+              mBallVel.y = 0.03;
+              mAiTouchTimer = 22;
+            }
           }
           mAiGroup.position.z += AI_SPEED * 0.9;
           mAiGroup.position.x += (mBall.position.x - mAiGroup.position.x) * 0.05;
@@ -2526,27 +2572,32 @@
         tm:     { x: mTmGroup.position.x  - mPrev.tm.x,  z: mTmGroup.position.z  - mPrev.tm.z  },
         tm2:    { x: mTm2Group.position.x - mPrev.tm2.x, z: mTm2Group.position.z - mPrev.tm2.z },
         tm3:    { x: mTm3Group.position.x - mPrev.tm3.x, z: mTm3Group.position.z - mPrev.tm3.z },
+        tm4:    { x: mTm4Group.position.x - mPrev.tm4.x, z: mTm4Group.position.z - mPrev.tm4.z },
       };
       mPrev.player.x = mPlayerGroup.position.x; mPrev.player.z = mPlayerGroup.position.z;
       mPrev.tm.x     = mTmGroup.position.x;     mPrev.tm.z     = mTmGroup.position.z;
       mPrev.tm2.x    = mTm2Group.position.x;    mPrev.tm2.z    = mTm2Group.position.z;
       mPrev.tm3.x    = mTm3Group.position.x;    mPrev.tm3.z    = mTm3Group.position.z;
+      mPrev.tm4.x    = mTm4Group.position.x;    mPrev.tm4.z    = mTm4Group.position.z;
 
-      // Shared teammate helper — pass toward predicted position of closest target
-      function tmPass(fromGroup, passTimer, setTimer) {
+      // Shared teammate helper — pass toward predicted position of closest forward target.
+      // attackDirZ: -1 = player's team (attack toward z=-52.5), +1 = opponent (attack toward z=+52.5).
+      // Returns true if a pass was fired, false if no forward target available.
+      function tmPass(fromGroup, passTimer, setTimer, attackDirZ) {
         const candidates = [
           { group: mPlayerGroup, vel: mVel.player },
           { group: mTmGroup,     vel: mVel.tm     },
           { group: mTm2Group,    vel: mVel.tm2    },
           { group: mTm3Group,    vel: mVel.tm3    },
-        ].filter(c => c.group !== fromGroup);
+          { group: mTm4Group,    vel: mVel.tm4    },
+        ].filter(c => c.group !== fromGroup)
+         .filter(c => attackDirZ * c.group.position.z > attackDirZ * fromGroup.position.z);
         let best = null, bestDist = Infinity;
         candidates.forEach(c => {
           const dx = c.group.position.x - fromGroup.position.x;
           const dz = c.group.position.z - fromGroup.position.z;
           const d = Math.sqrt(dx * dx + dz * dz);
           if (d < 45 && d < bestDist) {
-            // Estimate frames for ball to travel distance d, then predict receiver pos
             const spd = Math.min(0.8, d * 0.022);
             const frames = d / spd;
             const px = c.group.position.x + c.vel.x * frames;
@@ -2563,7 +2614,9 @@
           mBallVel.z = (best.dz / best.d) * spd;
           mBallVel.y = Math.min(0.22, best.d * 0.006);
           setTimer(90);
+          return true;
         }
+        return false;
       }
       function tmMove(group, home, engage, speed) {
         const tbdx = mBall.position.x - group.position.x;
@@ -2582,18 +2635,49 @@
         return tbdist;
       }
       const TM_ENGAGE = 18, TM_SPEED = 0.04;
-      // Teammate 1
+      // Helper: dribble ball forward, or force a pass if at the front edge of the home zone.
+      // Front edge (attacking side): attackDirZ * group.z >= attackDirZ * home.z + engage.
+      // Exception: within 25m of the attacking goal the AI may continue past the zone.
+      function tmDribbleFwd(fromGroup, home, engage, attackDirZ, setTimer) {
+        const atFrontEdge = attackDirZ * fromGroup.position.z >= attackDirZ * home.z + engage;
+        const nearGoal    = attackDirZ * fromGroup.position.z > 27.5; // within 25m of z=±52.5
+        if (atFrontEdge && !nearGoal) {
+          if (!tmPass(fromGroup, 0, setTimer, attackDirZ)) setTimer(30);
+          return;
+        }
+        mBallVel.z = attackDirZ * 0.18;
+        mBallVel.x += (-mBall.position.x * 0.02);
+        mBallVel.y = 0.02;
+        setTimer(25);
+      }
+      // Teammate 1 — attacks toward z=-52.5
       mTmPassTimer = Math.max(0, mTmPassTimer - 1);
       const tm1BallDist = tmMove(mTmGroup, TM_HOME, 13, TM_SPEED);
-      if (tm1BallDist <= 1.5 && mTmPassTimer === 0) tmPass(mTmGroup, mTmPassTimer, v => mTmPassTimer = v);
-      // Teammate 2
+      if (tm1BallDist <= 1.5 && mTmPassTimer === 0) {
+        if (!tmPass(mTmGroup, mTmPassTimer, v => mTmPassTimer = v, -1))
+          tmDribbleFwd(mTmGroup, TM_HOME, 13, -1, v => mTmPassTimer = v);
+      }
+      // Teammate 2 — attacks toward z=-52.5
       mTm2PassTimer = Math.max(0, mTm2PassTimer - 1);
       const tm2BallDist = tmMove(mTm2Group, TM2_HOME, TM_ENGAGE, TM_SPEED);
-      if (tm2BallDist <= 1.5 && mTm2PassTimer === 0) tmPass(mTm2Group, mTm2PassTimer, v => mTm2PassTimer = v);
-      // CB — tight zone, pass only (no shoot)
+      if (tm2BallDist <= 1.5 && mTm2PassTimer === 0) {
+        if (!tmPass(mTm2Group, mTm2PassTimer, v => mTm2PassTimer = v, -1))
+          tmDribbleFwd(mTm2Group, TM2_HOME, TM_ENGAGE, -1, v => mTm2PassTimer = v);
+      }
+      // CB — tight zone, attacks toward z=-52.5
       mTm3PassTimer = Math.max(0, mTm3PassTimer - 1);
       const tm3BallDist = tmMove(mTm3Group, TM3_HOME, 12, TM_SPEED);
-      if (tm3BallDist <= 1.5 && mTm3PassTimer === 0) tmPass(mTm3Group, mTm3PassTimer, v => mTm3PassTimer = v);
+      if (tm3BallDist <= 1.5 && mTm3PassTimer === 0) {
+        if (!tmPass(mTm3Group, mTm3PassTimer, v => mTm3PassTimer = v, -1))
+          tmDribbleFwd(mTm3Group, TM3_HOME, 12, -1, v => mTm3PassTimer = v);
+      }
+      // LB — tight zone, attacks toward z=-52.5
+      mTm4PassTimer = Math.max(0, mTm4PassTimer - 1);
+      const tm4BallDist = tmMove(mTm4Group, TM4_HOME, 12, TM_SPEED);
+      if (tm4BallDist <= 1.5 && mTm4PassTimer === 0) {
+        if (!tmPass(mTm4Group, mTm4PassTimer, v => mTm4PassTimer = v, -1))
+          tmDribbleFwd(mTm4Group, TM4_HOME, 12, -1, v => mTm4PassTimer = v);
+      }
 
       updateMatchCamera();
       mRenderer.render(mScene, mCamera);
